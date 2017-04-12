@@ -15,7 +15,7 @@ def entropy(y, classes):
     return sum(-pr*math.log2(pr) for pr in ll)
 
 class DecisionTree:
-    def __init__(self, X, y, classes, level=0, f=gini):
+    def __init__(self, X, y, classes, level=0, f=gini, condition=lambda x: True):
         self.attrSplit = None
         self.sons = []
         self.X = X
@@ -23,6 +23,7 @@ class DecisionTree:
         self.classes = classes
         self.level = level
         self.f = f
+        self.condition = condition
 
     def autoSplit(self, minSetSize=50, giniReduction=0.01):
         """
@@ -162,7 +163,30 @@ class DecisionTree:
             raise Exception('First value of', ll, 'out of range')
         return self.sons[ll[0]].getNode(ll[1:])
 
+    def predict(self, X):
+        """
+        :param X: [[attr1, attr2...], [attr1, attr2...]...]
+        :return: The value y[i] has the prediction of X[i]
+        """
+        if not type(X[0]) == list:
+            X = [X]
+        y = list()
+        for elem in X:
+            currentNode = self
+            t = True
+            while t:
+                t = False
+                for son in currentNode.sons:
+                    if son.condition(elem[currentNode.attrSplit]):
+                        currentNode = son
+                        t = True
+                        break
+            m = max([(currentNode.y.count(i), i) for i in set(currentNode.y)])
+            y.append(m[1])
+        return y
+
     def __str__(self):
+        # La accuracy s'ha de generalitza per a datasets amb etiquetes diferents a True i False
         strTree = 'size: ' + str(len(self.y)) + '; Accuracy: ' + str(max(self.y.count(True), self.y.count(False)) / len(self.y)) + \
                   '; Attr split: ' + str(self.attrSplit) + '; ' + self.f.__name__ + ': ' + str(self.f(self.y, self.classes)) + '\n'
         for i in range(len(self.sons)):
@@ -177,7 +201,11 @@ aux3 = df3.values.tolist()
 aux3 = [item for sublist in aux3 for item in sublist]
 dcTree = DecisionTree(aux2, aux3, [True, False], f=gini)
 t = time.clock()
-dcTree.autoSplit(minSetSize=20, giniReduction=0.01)
+#dcTree.autoSplit(minSetSize=20, giniReduction=0.01)
+dcTree.splitNode(4)
+for son in dcTree.sons:
+    if gini(son.y, son.classes) > 0.38:
+        son.splitNode(2)
 print(dcTree)
 # print(time.clock() - t)
 pass
