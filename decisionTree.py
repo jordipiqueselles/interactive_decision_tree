@@ -59,7 +59,8 @@ class DecisionTree:
                 d[self.X[i][idxAttr]][0].append(self.X[i])
                 d[self.X[i][idxAttr]][1].append(self.y[i])
             else:
-                d[self.X[i][idxAttr]] = ([self.X[i]], [self.y[i]])
+                # no funciona com m'esperava la funcio lambda
+                d[self.X[i][idxAttr]] = ([self.X[i]], [self.y[i]], lambda x: x == self.X[i][idxAttr])
         return d
 
     def __generateSubsetsNum(self, idxAttr, nClusters=0):
@@ -87,12 +88,13 @@ class DecisionTree:
             nClusters += 1
 
         d = dict()
+        clusters = [-math.inf] + kmeans.cluster_centers_.flatten().tolist() + [math.inf]
+        for i in range(1, len(clusters) - 1):
+            d[i-1] = ([], [], lambda x: (clusters[i-1] + clusters[i]) / 2 <= x and \
+                                                               x <= (clusters[i] + clusters[i+1]) / 2)
         for (nClusters, prt) in enumerate(predict):
-            if prt in d:
-                d[prt][0].append(self.X[nClusters])
-                d[prt][1].append(self.y[nClusters])
-            else:
-                d[prt] = ([self.X[nClusters]], [self.y[nClusters]])
+            d[prt][0].append(self.X[nClusters])
+            d[prt][1].append(self.y[nClusters])
         return d
 
     def splitNode(self, idxAttr):
@@ -102,8 +104,8 @@ class DecisionTree:
         """
         self.sons = list() # delete all previous sons
         d = self.__generateSubsets(idxAttr)
-        for elem in d:
-            self.sons.append(DecisionTree(d[elem][0], d[elem][1], self.classes, self.level + 1))
+        for elem in sorted(d.keys()):
+            self.sons.append(DecisionTree(d[elem][0], d[elem][1], self.classes, self.level + 1, self.f, d[elem][2]))
         self.attrSplit = idxAttr
 
     def auxFunc(self, i):
@@ -197,16 +199,16 @@ df = pd.read_csv('dadesSantPauProc.csv')
 df2 = df.get(['diesIngr', 'nIngr', 'nUrg', 'estacioAny', 'diagPrinc']) # 'diagPrinc'
 df3 = df.get(['reingres'])
 aux2 = df2.values.tolist()
-aux3 = df3.values.tolist()
-aux3 = [item for sublist in aux3 for item in sublist]
+aux3 = df3.values.flatten().tolist()
 dcTree = DecisionTree(aux2, aux3, [True, False], f=gini)
 t = time.clock()
 #dcTree.autoSplit(minSetSize=20, giniReduction=0.01)
 dcTree.splitNode(4)
-for son in dcTree.sons:
-    if gini(son.y, son.classes) > 0.38:
-        son.splitNode(2)
+# for son in dcTree.sons:
+#     if gini(son.y, son.classes) > 0.38:
+#         son.splitNode(2)
 print(dcTree)
+print(dcTree.predict(aux2))
 # print(time.clock() - t)
 pass
 # y = [0.5 < random.random() for i in range(5000000)]
