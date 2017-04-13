@@ -59,42 +59,43 @@ class DecisionTree:
                 d[self.X[i][idxAttr]][0].append(self.X[i])
                 d[self.X[i][idxAttr]][1].append(self.y[i])
             else:
-                # no funciona com m'esperava la funcio lambda
-                d[self.X[i][idxAttr]] = ([self.X[i]], [self.y[i]], lambda x: x == self.X[i][idxAttr])
+                d[self.X[i][idxAttr]] = ([self.X[i]], [self.y[i]], lambda x, atr=self.X[i][idxAttr]: x == atr)
         return d
 
-    def __generateSubsetsNum(self, idxAttr, nClusters=0):
+    def __generateSubsetsNum(self, idxAttr, i=0):
         """
         :param idxAttr:
         :return:
         Splits the dataset using an attribute that has a numerical value
         """
         x = [elem[idxAttr] for elem in self.X]
-        if nClusters <= 0:
-            nClusters = 2
+        if i <= 0:
+            i = 2
             bestScore = (statistics.variance(x) + 1)*3
         else:
             bestScore = -1
         x = np.array(x).reshape(-1,1)
 
         while True:
-            kmeans = KMeans(n_clusters=nClusters)
+            kmeans = KMeans(n_clusters=i)
             predict = kmeans.fit_predict(x)
             var = sum((x[i] - kmeans.cluster_centers_[predict[i]])**2 for i in range(len(x))) / len(x)
-            if (var+1) * 2**nClusters >= bestScore:
+            if (var+1) * 2**i >= bestScore:
                 # hauria d'agafar el nClusters que dona el millor bestScore, no el nClusters+1 després del bestScore
                 break
-            bestScore = (var+1) * 2**nClusters
-            nClusters += 1
+            bestScore = (var+1) * 2 ** i
+            i += 1
 
         d = dict()
-        clusters = [-math.inf] + kmeans.cluster_centers_.flatten().tolist() + [math.inf]
+        clusters = [-math.inf] + sorted(kmeans.cluster_centers_.flatten().tolist()) + [math.inf]
         for i in range(1, len(clusters) - 1):
-            d[i-1] = ([], [], lambda x: (clusters[i-1] + clusters[i]) / 2 <= x and \
-                                                               x <= (clusters[i] + clusters[i+1]) / 2)
-        for (nClusters, prt) in enumerate(predict):
-            d[prt][0].append(self.X[nClusters])
-            d[prt][1].append(self.y[nClusters])
+            d[i-1] = ([], [], lambda x, cl0=clusters[i-1], cl1=clusters[i], cl2=clusters[i+1]: \
+                (cl0 + cl1) / 2 <= x and x < (cl1 + cl2) / 2)
+        # diccionary that translates the index that kmeans gives to a cluster to the index of this cluster ordered
+        auxDict = dict((i, elem[0]) for (i,elem) in enumerate(sorted(enumerate(kmeans.cluster_centers_.flatten().tolist()), key=lambda x: x[1])))
+        for (i, prt) in enumerate(predict):
+            d[auxDict[prt]][0].append(self.X[i])
+            d[auxDict[prt]][1].append(self.y[i])
         return d
 
     def splitNode(self, idxAttr):
@@ -108,7 +109,7 @@ class DecisionTree:
             self.sons.append(DecisionTree(d[elem][0], d[elem][1], self.classes, self.level + 1, self.f, d[elem][2]))
         self.attrSplit = idxAttr
 
-    def auxFunc(self, i):
+    def _auxBestSplit(self, i):
         """
         :param i: I th attribute used to split the data
         :return: A tuple containing the gini impurity of that split and the index of the attribute used for this split
@@ -123,7 +124,7 @@ class DecisionTree:
         :return: Calculate the split that has the lower gini impurity
         """
         pool = multiprocessing.Pool(multiprocessing.cpu_count())
-        ll = pool.map(self.auxFunc, range(len(self.X[0])))
+        ll = pool.map(self._auxBestSplit, range(len(self.X[0])))
         return sorted(ll)
 
     def prune(self, idxSons=[]):
@@ -145,11 +146,14 @@ class DecisionTree:
         idxSons = sorted(idxSons, reverse=True)
         newX = list()
         newY = list()
+        # s'ha de mirar si funciona aquesta manera de fusionar les condicions de 2 nodes
+        newCondition = lambda x: False
         for i in idxSons:
             newX += self.sons[i].X
             newY += self.sons[i].y
+            newCondition = lambda x: newCondition(x) or self.sons[i].condition(x)
             self.sons.pop(i)
-        self.sons.append(DecisionTree(newX, newY, self.classes, self.level + 1))
+        self.sons.append(DecisionTree(newX, newY, self.classes, self.level + 1, self.f, newCondition))
 
     def getSons(self):
         return self.sons
@@ -203,12 +207,13 @@ aux3 = df3.values.flatten().tolist()
 dcTree = DecisionTree(aux2, aux3, [True, False], f=gini)
 t = time.clock()
 #dcTree.autoSplit(minSetSize=20, giniReduction=0.01)
-dcTree.splitNode(4)
+dcTree.splitNode(2)
 # for son in dcTree.sons:
 #     if gini(son.y, son.classes) > 0.38:
 #         son.splitNode(2)
 print(dcTree)
-print(dcTree.predict(aux2))
+ll = dcTree.predict(aux2)
+print(ll.count(True), ll.count(False))
 # print(time.clock() - t)
 pass
 # y = [0.5 < random.random() for i in range(5000000)]
