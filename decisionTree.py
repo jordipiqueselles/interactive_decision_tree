@@ -21,8 +21,14 @@ def decideCatAttr(x, atr):
 def decideNumAtrr(x, cl0, cl1, cl2):
     return (cl0 + cl1) / 2 <= x and x < (cl1 + cl2) / 2
 
+def joinConditions(x, cond1, cond2):
+    return cond1(x) or cond2(x)
+
 def alwaysTrue(x):
     return True
+
+def alwaysFalse(x):
+    return False
 
 class DecisionTree:
     def __init__(self, X, y, classes, level=0, f=gini, condition=alwaysTrue):
@@ -30,6 +36,7 @@ class DecisionTree:
         self.sons = []
         self.X = X
         self.y = y
+        self.classNode = max([(self.y.count(i), i) for i in set(self.y)])[1]
         self.classes = classes
         self.level = level
         self.f = f
@@ -167,11 +174,12 @@ class DecisionTree:
         newX = list()
         newY = list()
         # s'ha de mirar si funciona aquesta manera de fusionar les condicions de 2 nodes
-        newCondition = lambda x: False
+        newCondition = alwaysFalse
         for i in idxSons:
             newX += self.sons[i].X
             newY += self.sons[i].y
-            newCondition = lambda x: newCondition(x) or self.sons[i].condition(x)
+            # lambda x: newCondition(x) or self.sons[i].condition(x)
+            newCondition = functools.partial(joinConditions, cond1=newCondition, cond2=self.sons[i].condition)
             self.sons.pop(i)
         self.sons.append(DecisionTree(newX, newY, self.classes, self.level + 1, self.f, newCondition))
 
@@ -199,8 +207,7 @@ class DecisionTree:
                     currentNode = son
                     t = True
                     break
-        m = max([(currentNode.y.count(i), i) for i in set(currentNode.y)])
-        return m[1]
+        return currentNode.classNode
 
     def predict(self, X):
         """
@@ -215,8 +222,10 @@ class DecisionTree:
 
     def __str__(self):
         # La accuracy s'ha de generalitza per a datasets amb etiquetes diferents a True i False
-        strTree = 'size: ' + str(len(self.y)) + '; Accuracy: ' + str(max(self.y.count(True), self.y.count(False)) / len(self.y)) + \
-                  '; Attr split: ' + str(self.attrSplit) + '; ' + self.f.__name__ + ': ' + str(self.f(self.y, self.classes)) + '\n'
+        strTree = 'size: ' + str(len(self.y)) + '; Accuracy: ' + \
+                  str(round(max(self.y.count(True), self.y.count(False)) / len(self.y), 4)) + \
+                  '; Attr split: ' + str(self.attrSplit) + '; ' + self.f.__name__ + ': ' + \
+                  str(round(self.f(self.y, self.classes), 4)) + "; Predict: " + str(self.classNode) + '\n'
         for i in range(len(self.sons)):
             strTree += (self.level + 1) * '\t' + str(i) + ' -> ' + self.sons[i].__str__()
         return strTree
@@ -229,7 +238,7 @@ aux3 = df3.values.flatten().tolist()
 dcTree = DecisionTree(aux2, aux3, [True, False], f=gini)
 t = time.time()
 dcTree.autoSplit(minSetSize=20, giniReduction=0.01)
-#dcTree.splitNode(2)
+# dcTree.splitNode(2)
 # for son in dcTree.sons:
 #     if gini(son.y, son.classes) > 0.38:
 #         son.splitNode(2)
