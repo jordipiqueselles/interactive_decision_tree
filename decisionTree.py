@@ -3,8 +3,9 @@ from sklearn.cluster import KMeans
 import multiprocessing
 import time
 import math
-import statistics
+import copy
 import numpy as np
+import functools
 
 def gini(y, classes):
     ll = (y.count(c) / len(y) for c in classes)
@@ -14,8 +15,17 @@ def entropy(y, classes):
     ll = (y.count(c) / len(y) for c in classes)
     return sum(-pr*math.log2(pr) for pr in ll)
 
+def decideCatAttr(x, atr):
+    return x == atr
+
+def decideNumAtrr(x, cl0, cl1, cl2):
+    return (cl0 + cl1) / 2 <= x and x < (cl1 + cl2) / 2
+
+def alwaysTrue(x):
+    return True
+
 class DecisionTree:
-    def __init__(self, X, y, classes, level=0, f=gini, condition=lambda x: True):
+    def __init__(self, X, y, classes, level=0, f=gini, condition=alwaysTrue):
         self.attrSplit = None
         self.sons = []
         self.X = X
@@ -40,7 +50,7 @@ class DecisionTree:
     def __generateSubsets(self, idxAttr):
         """
         :param idxAttr: Index of the attribute that will be used to split the dataset
-        :return: A diccionary: key -> one of the values of the selected attribute; value -> (Xi,yi) that have this attribute value
+        :return: A diccionary with key -> value of the attribute; value -> indexes of rows that have this attribute value and a function
         """
         if type(self.X[0][idxAttr]) == int or type(self.X[0][idxAttr]) == float:
             return self.__generateSubsetsNum(idxAttr)
@@ -56,10 +66,10 @@ class DecisionTree:
         d = dict()
         for i in range(len(self.X)):
             if self.X[i][idxAttr] in d:
-                d[self.X[i][idxAttr]][0].append(self.X[i])
-                d[self.X[i][idxAttr]][1].append(self.y[i])
+                d[self.X[i][idxAttr]][0].append(i)
             else:
-                d[self.X[i][idxAttr]] = ([self.X[i]], [self.y[i]], lambda x, atr=self.X[i][idxAttr]: x == atr)
+                # d[self.X[i][idxAttr]] = ([i], lambda x, atr=self.X[i][idxAttr]: x == atr)
+                d[self.X[i][idxAttr]] = ([i], functools.partial(decideCatAttr, atr=self.X[i][idxAttr]))
         return d
 
     def __generateSubsetsNum(self, idxAttr, i=0):
@@ -69,33 +79,38 @@ class DecisionTree:
         Splits the dataset using an attribute that has a numerical value
         """
         x = [elem[idxAttr] for elem in self.X]
-        if i <= 0:
-            i = 2
-            bestScore = (statistics.variance(x) + 1)*3
-        else:
-            bestScore = -1
         x = np.array(x).reshape(-1,1)
-
-        while True:
-            kmeans = KMeans(n_clusters=i)
+        if i <= 0:
+            kmeans = KMeans(n_clusters=1)
             predict = kmeans.fit_predict(x)
             var = sum((x[i] - kmeans.cluster_centers_[predict[i]])**2 for i in range(len(x))) / len(x)
-            if (var+1) * 2**i >= bestScore:
-                # hauria d'agafar el nClusters que dona el millor bestScore, no el nClusters+1 després del bestScore
+            bestScore = (var + 1) * 1.6
+            i = 2
+        else:
+            bestScore = -1 # fa que a la primera volta del while entri dins de l'if i executi el break
+
+        while True:
+            newKmeans = KMeans(n_clusters=i)
+            newPredict = newKmeans.fit_predict(x)
+            var = sum((x[i] - newKmeans.cluster_centers_[newPredict[i]])**2 for i in range(len(x))) / len(x)
+            if (var+1) * 1.3**i >= bestScore:
+                predict = kmeans.predict(x)
                 break
-            bestScore = (var+1) * 2 ** i
+            bestScore = (var+1) * 1.3 ** i
+            kmeans = newKmeans # copy?
             i += 1
 
         d = dict()
         clusters = [-math.inf] + sorted(kmeans.cluster_centers_.flatten().tolist()) + [math.inf]
         for i in range(1, len(clusters) - 1):
-            d[i-1] = ([], [], lambda x, cl0=clusters[i-1], cl1=clusters[i], cl2=clusters[i+1]: \
-                (cl0 + cl1) / 2 <= x and x < (cl1 + cl2) / 2)
+            d[i-1] = ([], functools.partial(decideNumAtrr, cl0=clusters[i-1], cl1=clusters[i], cl2=clusters[i+1]))
         # diccionary that translates the index that kmeans gives to a cluster to the index of this cluster ordered
-        auxDict = dict((i, elem[0]) for (i,elem) in enumerate(sorted(enumerate(kmeans.cluster_centers_.flatten().tolist()), key=lambda x: x[1])))
+        auxDict = dict((i, elem[0]) for (i, elem) in enumerate(sorted(enumerate(kmeans.cluster_centers_.flatten().tolist()), key=lambda x: x[1])))
         for (i, prt) in enumerate(predict):
-            d[auxDict[prt]][0].append(self.X[i])
-            d[auxDict[prt]][1].append(self.y[i])
+            d[auxDict[prt]][0].append(i)
+
+        # for e in d:
+        #     print(d[e])
         return d
 
     def splitNode(self, idxAttr):
@@ -106,17 +121,22 @@ class DecisionTree:
         self.sons = list() # delete all previous sons
         d = self.__generateSubsets(idxAttr)
         for elem in sorted(d.keys()):
-            self.sons.append(DecisionTree(d[elem][0], d[elem][1], self.classes, self.level + 1, self.f, d[elem][2]))
+            newX = [self.X[i] for i in d[elem][0]]
+            newY = [self.y[i] for i in d[elem][0]]
+            self.sons.append(DecisionTree(newX, newY, self.classes, self.level + 1, self.f, d[elem][1]))
         self.attrSplit = idxAttr
 
     def _auxBestSplit(self, i):
         """
         :param i: I th attribute used to split the data
         :return: A tuple containing the gini impurity of that split and the index of the attribute used for this split
-        This function is used to paralelize the function bestSlpit
+        This function is used to paralelize the function bestSplit
         """
-        d = self.__generateSubsets(i)
-        gImp = sum((len(d[subs][1])/len(self.y))*self.f(d[subs][1], self.classes) for subs in d)
+        d = self.__generateSubsets(i) # no cal que en aquest cas __generateSubsets faci una copia de X
+        gImp = 0
+        for subs in d:
+            newY = [self.y[i] for i in d[subs][0]]
+            gImp += len(d[subs][0])/len(self.y) * self.f(newY, self.classes)
         return (gImp, i)
 
     def bestSplit(self):
@@ -169,6 +189,19 @@ class DecisionTree:
             raise Exception('First value of', ll, 'out of range')
         return self.sons[ll[0]].getNode(ll[1:])
 
+    def _auxPredict(self, elem):
+        currentNode = self
+        t = True
+        while t:
+            t = False
+            for son in currentNode.sons:
+                if son.condition(elem[currentNode.attrSplit]):
+                    currentNode = son
+                    t = True
+                    break
+        m = max([(currentNode.y.count(i), i) for i in set(currentNode.y)])
+        return m[1]
+
     def predict(self, X):
         """
         :param X: [[attr1, attr2...], [attr1, attr2...]...]
@@ -176,20 +209,9 @@ class DecisionTree:
         """
         if not type(X[0]) == list:
             X = [X]
-        y = list()
-        for elem in X:
-            currentNode = self
-            t = True
-            while t:
-                t = False
-                for son in currentNode.sons:
-                    if son.condition(elem[currentNode.attrSplit]):
-                        currentNode = son
-                        t = True
-                        break
-            m = max([(currentNode.y.count(i), i) for i in set(currentNode.y)])
-            y.append(m[1])
-        return y
+        pool = multiprocessing.Pool(multiprocessing.cpu_count())
+        # return [self._auxPredict(elem) for elem in X]
+        return pool.map(self._auxPredict, X)
 
     def __str__(self):
         # La accuracy s'ha de generalitza per a datasets amb etiquetes diferents a True i False
@@ -205,16 +227,18 @@ df3 = df.get(['reingres'])
 aux2 = df2.values.tolist()
 aux3 = df3.values.flatten().tolist()
 dcTree = DecisionTree(aux2, aux3, [True, False], f=gini)
-t = time.clock()
-#dcTree.autoSplit(minSetSize=20, giniReduction=0.01)
-dcTree.splitNode(2)
+t = time.time()
+dcTree.autoSplit(minSetSize=20, giniReduction=0.01)
+#dcTree.splitNode(2)
 # for son in dcTree.sons:
 #     if gini(son.y, son.classes) > 0.38:
 #         son.splitNode(2)
 print(dcTree)
+print(time.time() - t)
+t = time.time()
 ll = dcTree.predict(aux2)
 print(ll.count(True), ll.count(False))
-# print(time.clock() - t)
+print(time.time() - t)
 pass
 # y = [0.5 < random.random() for i in range(5000000)]
 # print(y.count(True))
