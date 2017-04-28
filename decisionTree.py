@@ -3,7 +3,7 @@ from sklearn.cluster import KMeans
 import multiprocessing
 import time
 import math
-import copy
+import operator
 import numpy as np
 import functools
 
@@ -13,7 +13,20 @@ def gini(y, classes):
 
 def entropy(y, classes):
     ll = (y.count(c) / len(y) for c in classes)
+    # vigilar probabilitat 0
     return sum(-pr*math.log2(pr) for pr in ll)
+
+def accuracy(pred, real):
+    return sum(map(lambda x: x[0] == x[1], zip(pred, real))) / len(pred)
+
+def precision(pred, real):
+    return sum(map(lambda x: x[0] and x[1], zip(pred, real))) / sum(pred)
+
+def recall(pred, real):
+    return sum(map(lambda x: x[0] and x[1], zip(pred, real))) / sum(real)
+
+def fScore(pred, real):
+    return 2 * precision(pred, real) * recall(pred, real) / (precision(pred, real) + recall(pred, real))
 
 def decideCatAttr(x, atr):
     return x == atr
@@ -154,16 +167,11 @@ class DecisionTree:
         ll = pool.map(self._auxBestSplit, range(len(self.X[0])))
         return sorted(ll)
 
-    def prune(self, idxSons=[]):
+    def prune(self):
         """
-        :param idxSons: List of indexes of the sons that will be pruned
-        Eliminates the sons described in idxSons and restores its data back to the parent node
+        Eliminates all the sons of this node
         """
-        if idxSons == []:
-            idxSons = list(range(len(self.sons)))
-        idxSons = sorted(idxSons, reverse=True)
-        for i in idxSons:
-            self.sons.pop(i)
+        self.sons = []
 
     def joinNodes(self, idxSons):
         """
@@ -223,9 +231,11 @@ class DecisionTree:
     def __str__(self):
         # La accuracy s'ha de generalitza per a datasets amb etiquetes diferents a True i False
         strTree = 'size: ' + str(len(self.y)) + '; Accuracy: ' + \
-                  str(round(max(self.y.count(True), self.y.count(False)) / len(self.y), 4)) + \
+                  str(round(max([self.y.count(cl) for cl in self.classes]) / len(self.y), 4)) + \
                   '; Attr split: ' + str(self.attrSplit) + '; ' + self.f.__name__ + ': ' + \
                   str(round(self.f(self.y, self.classes), 4)) + "; Predict: " + str(self.classNode) + '\n'
+                    # posar les funcions de accuracy i altres (recall, precision...) fora de la classe i
+                    # cridar-les en aquest print
         for i in range(len(self.sons)):
             strTree += (self.level + 1) * '\t' + str(i) + ' -> ' + self.sons[i].__str__()
         return strTree
@@ -246,7 +256,7 @@ print(dcTree)
 print(time.time() - t)
 t = time.time()
 ll = dcTree.predict(aux2)
-print(ll.count(True), ll.count(False))
+print(fScore(ll, aux3))
 print(time.time() - t)
 pass
 # y = [0.5 < random.random() for i in range(5000000)]
