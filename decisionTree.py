@@ -1,11 +1,15 @@
 import pandas as pd
 from sklearn.cluster import KMeans
+from sklearn.naive_bayes import MultinomialNB, BernoulliNB, GaussianNB
+from sklearn.metrics import silhouette_score
 import multiprocessing
 import time
 import math
 import operator
 import numpy as np
 import functools
+
+# Functions to evaluate the performance of a split #
 
 def gini(y, classes):
     ll = (y.count(c) / len(y) for c in classes)
@@ -15,6 +19,8 @@ def entropy(y, classes):
     ll = (y.count(c) / len(y) for c in classes)
     # vigilar probabilitat 0
     return sum(-pr*math.log2(pr) for pr in ll)
+
+# Functions to evaluate the general performance of the predictive model #
 
 def accuracy(pred, real):
     return sum(map(lambda x: x[0] == x[1], zip(pred, real))) / len(pred)
@@ -27,6 +33,9 @@ def recall(pred, real):
 
 def fScore(pred, real):
     return 2 * precision(pred, real) * recall(pred, real) / (precision(pred, real) + recall(pred, real))
+
+# Functions used to do some calculations that cannot be done by a lambda function because the code is parallelized
+# in some parts and it cannot acces to a local function as a lambda can be #
 
 def decideCatAttr(x, atr):
     return x == atr
@@ -43,8 +52,18 @@ def alwaysTrue(x):
 def alwaysFalse(x):
     return False
 
+# Functions that evaluate the performance of a kmeans clustering #
+
+def perfKmeanVar(x, predict, kmeans, i):
+    var = sum((x[i] - kmeans.cluster_centers_[predict[i]])**2 for i in range(len(x))) / len(x)
+    return (var + 1) * 1.3**i # 1.3
+
+def perfKmeansSilhouette(x, predict, kmeans=None, i=None):
+    # the sample size should be not too large
+    return -silhouette_score(x, predict, sample_size=5000) # valor petit -> millor
+
 class DecisionTree:
-    def __init__(self, X, y, classes, level=0, f=gini, condition=alwaysTrue):
+    def __init__(self, X, y, classes, level=0, f=gini, condition=alwaysTrue, perfKmeans=perfKmeansSilhouette):
         self.attrSplit = None
         self.sons = []
         self.X = X
@@ -54,6 +73,8 @@ class DecisionTree:
         self.level = level
         self.f = f
         self.condition = condition
+        self.naiveBayes = GaussianNB().fit([elem[:3] for elem in X], y)
+        self.perfKmeans = perfKmeans
 
     def autoSplit(self, minSetSize=50, giniReduction=0.01):
         """
@@ -99,24 +120,26 @@ class DecisionTree:
         Splits the dataset using an attribute that has a numerical value
         """
         x = [elem[idxAttr] for elem in self.X]
+        maxClusters = len(set(x)) # there can't be more clusters than different values of the data
         x = np.array(x).reshape(-1,1)
-        if i <= 0:
-            kmeans = KMeans(n_clusters=1)
-            predict = kmeans.fit_predict(x)
-            var = sum((x[i] - kmeans.cluster_centers_[predict[i]])**2 for i in range(len(x))) / len(x)
-            bestScore = (var + 1) * 1.6
+        if i <= 1:
+            kmeans = KMeans(n_clusters=1, n_jobs=1).fit(x)
+            bestScore = math.inf
             i = 2
         else:
+            if i > maxClusters:
+                raise Exception("Too much number of clusters")
             bestScore = -1 # fa que a la primera volta del while entri dins de l'if i executi el break
+            kmeans = KMeans(n_clusters=i, n_jobs=1).fit(x)
 
         while True:
-            newKmeans = KMeans(n_clusters=i)
+            newKmeans = KMeans(n_clusters=i, n_jobs=1) # parallel kmeans, using all the processors // de moment no
             newPredict = newKmeans.fit_predict(x)
-            var = sum((x[i] - newKmeans.cluster_centers_[newPredict[i]])**2 for i in range(len(x))) / len(x)
-            if (var+1) * 1.3**i >= bestScore:
+            newScore = self.perfKmeans(x, newPredict, newKmeans, i)
+            if newScore >= bestScore or i > maxClusters:
                 predict = kmeans.predict(x)
                 break
-            bestScore = (var+1) * 1.3 ** i
+            bestScore = newScore
             kmeans = newKmeans # copy?
             i += 1
 
@@ -255,11 +278,26 @@ dcTree.autoSplit(minSetSize=20, giniReduction=0.01)
 print(dcTree)
 print(time.time() - t)
 t = time.time()
+exit(0)
+
+while True:
+    try:
+        exec(input())
+    except Exception as e:
+        print(e)
+
 ll = dcTree.predict(aux2)
 print(fScore(ll, aux3))
 print(time.time() - t)
-pass
+
 # y = [0.5 < random.random() for i in range(5000000)]
 # print(y.count(True))
 # t = time.clock()
 # print(gini(y, [True, False]), time.clock() - t)
+
+# interactive
+while True:
+    try:
+        eval(input())
+    except:
+        pass
