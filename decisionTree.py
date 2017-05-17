@@ -62,6 +62,48 @@ def perfKmeansSilhouette(x, predict, kmeans=None, i=None):
     # the sample size should be not too large
     return -silhouette_score(x, predict, sample_size=1000) # valor petit -> millor
 
+# Aux functions #
+
+def delEmptyEntries(d):
+    """
+    :param d: A dictionary with value -> (list(), ...)
+    Eliminates the entries that have as value[0] an empty list
+    """
+    for key in list(d.keys()):
+        if len(d[key][0]) == 0:
+            d.pop(key)
+
+def automaticClustering(i, x, perfKmeans):
+    """
+    :param i: The number of clusters used to split the dataset
+    :param x: The numerical data that have to be clustered
+    :return: A kmeans object
+    If i <= 1 the function tries to find the best number of clusters based on the function self.perfKmeans
+    If i > 1 the function aplies kmeans with n_clusters=min(i, maxClusters)
+    """
+    maxClusters = len(set(x.flatten().tolist())) # there can't be more clusters than different values of the data
+    if i > 1:
+        i = min(i, maxClusters)
+        kmeans = KMeans(n_clusters=i, n_jobs=1).fit(x)
+    else:
+        kmeans = KMeans(n_clusters=1, n_jobs=1).fit(x)
+        newKmeans = kmeans
+        bestScore = math.inf
+        newScore = 999999
+        i = 2
+
+        while newScore < bestScore and i <= maxClusters:
+            bestScore = newScore
+            kmeans = newKmeans # copy?
+
+            newKmeans = KMeans(n_clusters=i, n_jobs=1) # parallel kmeans, using all the processors // not now
+            newPredict = newKmeans.fit_predict(x)
+            newScore = perfKmeans(x, newPredict, newKmeans, i)
+            i += 1
+    return kmeans
+
+# The main class #
+
 class DecisionTree:
     def __init__(self, X, y, classes, level=0, f=gini, condition=alwaysTrue, perfKmeans=perfKmeanVar, staticSplits=dict()):
         """
@@ -72,8 +114,8 @@ class DecisionTree:
         :param f: Function used to evaluate the performance of a split
         :param condition: The condition must accomplish the data from its parent to belong to this node
         :param perfKmeans: Function to evaluate the performance of the clustering of a numerical attribute using kmeans
-        :param staticSplits: A dictionary with key -> index of an attribute; value -> how to split this attribute
-        For a numerical attribute the value is a list of numbers indicating the center of the clusters and for a categorical
+        :param staticSplits: A dictionary with key -> index of an attribute; value -> how to split this attribute \
+        For a numerical attribute the value is a list of numbers indicating the center of the clusters and for a categorical \
         value is a list of lists, the second list containing the attributes that belong to a cluster
         """
         self.attrSplit = None
@@ -87,7 +129,8 @@ class DecisionTree:
         self.condition = condition
         self.naiveBayes = GaussianNB().fit([elem[:3] for elem in X], y)
         self.perfKmeans = perfKmeans
-        self.staticSplits = staticSplits#{2: [1,3,5,7]}#staticSplits
+        self.staticSplits = {4: [['_001', '_140', '_240', '_280', '_290', '_320', '_360', '_390', '_460', '_520', '_580', '_630'], \
+                ['_680', '_710', '_740', '_760', '_780', '_800']]}#staticSplits#{2: [1,3,5,7]}
 
     def autoSplit(self, minSetSize=50, giniReduction=0.01):
         """
@@ -118,35 +161,28 @@ class DecisionTree:
         Splits the dataset using an attribute that has a categorical value
         """
         d = dict()
+        # create the same value -> ([], cond) for each value of the attribute idxAttr that must belong to the same node
+        for st in self.staticSplits.get(idxAttr, []):
+            cond = alwaysTrue
+            for elem in st:
+                auxCond = functools.partial(decideCatAttr, atr=elem)
+                cond = functools.partial(joinConditions, cond1=cond, cond2=auxCond)
+            value = ([], cond)
+            for elem in st:
+                d[elem] = value
+        # put the index of the elements in X to the correct entry of the dictionary d
         for i in range(len(self.X)):
             if self.X[i][idxAttr] in d:
                 d[self.X[i][idxAttr]][0].append(i)
             else:
                 # d[self.X[i][idxAttr]] = ([i], lambda x, atr=self.X[i][idxAttr]: x == atr)
                 d[self.X[i][idxAttr]] = ([i], functools.partial(decideCatAttr, atr=self.X[i][idxAttr]))
+        # eliminate the elements in d that belong to the same split and eliminate the splits with 0 elements
+        for st in self.staticSplits.get(idxAttr, []):
+            for elem in st[1:]:
+                d.pop(elem)
+        delEmptyEntries(d)
         return d
-
-    def __automaticClustering(self, i, x):
-        maxClusters = len(set(x.flatten().tolist())) # there can't be more clusters than different values of the data
-        if i > 1:
-            i = min(i, maxClusters)
-            kmeans = KMeans(n_clusters=i, n_jobs=1).fit(x)
-        else:
-            kmeans = KMeans(n_clusters=1, n_jobs=1).fit(x)
-            newKmeans = kmeans
-            bestScore = math.inf
-            newScore = 999999
-            i = 2
-
-            while newScore < bestScore and i <= maxClusters:
-                bestScore = newScore
-                kmeans = newKmeans # copy?
-
-                newKmeans = KMeans(n_clusters=i, n_jobs=1) # parallel kmeans, using all the processors
-                newPredict = newKmeans.fit_predict(x)
-                newScore = self.perfKmeans(x, newPredict, newKmeans, i)
-                i += 1
-        return kmeans
 
     def __generateSubsetsNum(self, idxAttr, i=0):
         """
@@ -158,16 +194,12 @@ class DecisionTree:
         x = np.array(x).reshape(-1,1)
         if idxAttr in self.staticSplits:
             cls_centers = self.staticSplits[idxAttr]
-        else:
-            cls_centers = []
-
-        if len(cls_centers) == 0:
-            kmeans = self.__automaticClustering(i, x)
-        else:
             kmeans = KMeans(n_clusters=len(cls_centers))
             kmeans.cluster_centers_ = np.array(cls_centers).reshape(-1,1)
-        predict = kmeans.predict(x)
+        else:
+            kmeans = automaticClustering(i, x, self.perfKmeans)
 
+        predict = kmeans.predict(x)
         d = dict()
         clusters = [-math.inf] + sorted(kmeans.cluster_centers_.flatten().tolist()) + [math.inf]
         for i in range(1, len(clusters) - 1):
@@ -176,11 +208,7 @@ class DecisionTree:
         auxDict = dict((i, elem[0]) for (i, elem) in enumerate(sorted(enumerate(kmeans.cluster_centers_.flatten().tolist()), key=lambda x: x[1])))
         for (i, prt) in enumerate(predict):
             d[auxDict[prt]][0].append(i)
-
-        # eliminate entries that don't have any element
-        for key in list(d.keys()):
-            if len(d[key][0]) == 0:
-                d.pop(key)
+        delEmptyEntries(d)
         return d
 
     def splitNode(self, idxAttr):
@@ -297,8 +325,8 @@ aux2 = df2.values.tolist()
 aux3 = df3.values.flatten().tolist()
 dcTree = DecisionTree(aux2, aux3, [True, False], f=gini)
 t = time.time()
-dcTree.autoSplit(minSetSize=100, giniReduction=0.01)
-# dcTree.splitNode(2)
+# dcTree.autoSplit(minSetSize=100, giniReduction=0.01)
+dcTree.splitNode(4)
 # for son in dcTree.sons:
 #     if gini(son.y, son.classes) > 0.38:
 #         son.splitNode(2)
