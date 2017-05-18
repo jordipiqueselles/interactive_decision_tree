@@ -17,8 +17,7 @@ def gini(y, classes):
 
 def entropy(y, classes):
     ll = (y.count(c) / len(y) for c in classes)
-    # vigilar probabilitat 0
-    return sum(-pr*math.log2(pr) for pr in ll)
+    return sum(-pr*math.log2(pr+1E-60) for pr in ll)
 
 # Functions to evaluate the general performance of the predictive model #
 
@@ -114,9 +113,7 @@ class DecisionTree:
         :param f: Function used to evaluate the performance of a split
         :param condition: The condition must accomplish the data from its parent to belong to this node
         :param perfKmeans: Function to evaluate the performance of the clustering of a numerical attribute using kmeans
-        :param staticSplits: A dictionary with key -> index of an attribute; value -> how to split this attribute \
-        For a numerical attribute the value is a list of numbers indicating the center of the clusters and for a categorical \
-        value is a list of lists, the second list containing the attributes that belong to a cluster
+        :param staticSplits: A dictionary with key -> index of an attribute; value -> how to split this attribute. For a numerical attribute the value is a list of numbers indicating the center of the clusters and for a categorical value is a list of lists, the second list containing the attributes that belong to a cluster
         """
         self.attrSplit = None
         self.sons = []
@@ -129,8 +126,8 @@ class DecisionTree:
         self.condition = condition
         self.naiveBayes = GaussianNB().fit([elem[:3] for elem in X], y)
         self.perfKmeans = perfKmeans
-        self.staticSplits = {4: [['_001', '_140', '_240', '_280', '_290', '_320', '_360', '_390', '_460', '_520', '_580', '_630'], \
-                ['_680', '_710', '_740', '_760', '_780', '_800']]}#staticSplits#{2: [1,3,5,7]}
+        # staticSplits ha de ser coherent i amb el format correcte. No cal que sigui exhaustiu
+        self.staticSplits = staticSplits#{4: [['_001', '_140', '_240', '_280', '_290', '_320', '_360', '_390', '_460', '_520', '_580', '_630'], ['_680', '_710', '_740', '_760', '_780', '_800']]}#{2: [1,3,5,7]}
 
     def autoSplit(self, minSetSize=50, giniReduction=0.01):
         """
@@ -221,7 +218,7 @@ class DecisionTree:
         for elem in sorted(d.keys()):
             newX = [self.X[i] for i in d[elem][0]]
             newY = [self.y[i] for i in d[elem][0]]
-            self.sons.append(DecisionTree(newX, newY, self.classes, self.level + 1, self.f, d[elem][1]))
+            self.sons.append(DecisionTree(newX, newY, self.classes, self.level + 1, self.f, d[elem][1], self.perfKmeans, self.staticSplits))
         self.attrSplit = idxAttr
 
     def _auxBestSplit(self, i):
@@ -267,7 +264,7 @@ class DecisionTree:
             # lambda x: newCondition(x) or self.sons[i].condition(x)
             newCondition = functools.partial(joinConditions, cond1=newCondition, cond2=self.sons[i].condition)
             self.sons.pop(i)
-        self.sons.append(DecisionTree(newX, newY, self.classes, self.level + 1, self.f, newCondition))
+        self.sons.append(DecisionTree(newX, newY, self.classes, self.level + 1, self.f, newCondition, self.perfKmeans, self.staticSplits))
 
     def getSons(self):
         return self.sons
