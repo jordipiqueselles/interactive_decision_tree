@@ -124,10 +124,32 @@ class DecisionTree:
         self.level = level
         self.f = f
         self.condition = condition
-        self.naiveBayes = GaussianNB().fit([elem[:3] for elem in X], y)
         self.perfKmeans = perfKmeans
         # staticSplits ha de ser coherent i amb el format correcte. No cal que sigui exhaustiu
         self.staticSplits = staticSplits#{4: [['_001', '_140', '_240', '_280', '_290', '_320', '_360', '_390', '_460', '_520', '_580', '_630'], ['_680', '_710', '_740', '_760', '_780', '_800']]}#{2: [1,3,5,7]}
+
+        # Naive Bayes classifier
+        self.gaussNB = GaussianNB()
+        Xnum = [[atr for atr in elem if type(atr) == float or type(atr) == int] for elem in X]
+        self.gaussNB.fit(Xnum, y)
+
+        Xcat = [[atr for atr in elem if type(atr) != float and type(atr) != int] for elem in X]
+        typesCat = [set() for i in range(len(Xcat[0]))]
+        for row in Xcat:
+            for i in range(len(row)):
+                typesCat[i].add(row[i])
+        typesCat = [list(s) for s in typesCat]
+
+        Xmult = list()
+        for row in Xcat:
+            ll = []
+            for i in range(len(row)):
+                auxLL = [0] * len(typesCat[i])
+                auxLL[typesCat[i].index(row[i])] = 1
+                ll += auxLL
+            Xmult.append(ll)
+        self.multNB = MultinomialNB()
+        self.multNB.fit(Xmult, y)
 
     def autoSplit(self, minSetSize=50, giniReduction=0.01):
         """
@@ -280,7 +302,7 @@ class DecisionTree:
             raise Exception('First value of', ll, 'out of range')
         return self.sons[ll[0]].getNode(ll[1:])
 
-    def _auxPredict(self, elem):
+    def _auxPredict(self, elem, bayes):
         currentNode = self
         t = True
         while t:
@@ -290,9 +312,12 @@ class DecisionTree:
                     currentNode = son
                     t = True
                     break
-        return currentNode.classNode
+        if bayes:
+            return currentNode.gaussNB.predict(elem)
+        else:
+            return currentNode.classNode
 
-    def predict(self, X):
+    def predict(self, X, bayes=False):
         """
         :param X: [[attr1, attr2...], [attr1, attr2...]...]
         :return: The value y[i] has the prediction of X[i]
@@ -301,7 +326,7 @@ class DecisionTree:
             X = [X]
         pool = multiprocessing.Pool(multiprocessing.cpu_count())
         # return [self._auxPredict(elem) for elem in X]
-        return pool.map(self._auxPredict, X)
+        return pool.map(functools.partial(self._auxPredict, bayes=bayes), X)
 
     def __str__(self):
         # La accuracy s'ha de generalitza per a datasets amb etiquetes diferents a True i False

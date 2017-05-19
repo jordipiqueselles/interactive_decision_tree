@@ -8,11 +8,11 @@ maxRange = 300
 maxSigma = 10
 maxPointsCluster = 100
 minPointsCluster = 20
-maxIter = 50
+nIter = 50
 ll_a_min = []
 ll_a_max = []
 
-for k in range(maxIter):
+for k in range(nIter):
     # generate clusters
     X = list()
     nClusters = random.randint(minClusters, maxClusters)
@@ -39,7 +39,7 @@ for k in range(maxIter):
     print(a_max, a_min)
 
 # take the 80% of the measurements
-ll_a_max = sorted(ll_a_max)[int(maxIter*0.2):]
-ll_a_min = sorted(ll_a_min)[:int(maxIter*0.8)]
+ll_a_max = sorted(ll_a_max)[int(nIter * 0.2):]
+ll_a_min = sorted(ll_a_min)[:int(nIter * 0.8)]
 print()
 print(ll_a_max[0], ll_a_min[-1])
