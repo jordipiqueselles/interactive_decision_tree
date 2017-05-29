@@ -340,41 +340,42 @@ class DecisionTree:
             strTree += (self.level + 1) * '\t' + str(i) + ' -> ' + self.sons[i].__str__()
         return strTree
 
-df = pd.read_csv('dadesSantPauProc.csv')
-df2 = df.get(['diesIngr', 'nIngr', 'nUrg', 'estacioAny', 'diagPrinc']) # 'diagPrinc'
-df3 = df.get(['reingres'])
-aux2 = df2.values.tolist()
-aux3 = df3.values.flatten().tolist()
-dcTree = DecisionTree(aux2, aux3, [True, False], f=gini)
-t = time.time()
-# dcTree.autoSplit(minSetSize=100, giniReduction=0.01)
-dcTree.splitNode(4)
-# for son in dcTree.sons:
-#     if gini(son.y, son.classes) > 0.38:
-#         son.splitNode(2)
-print(dcTree)
-print(time.time() - t)
-t = time.time()
-exit(0)
+if False:
+    df = pd.read_csv('dadesSantPauProc.csv')
+    df2 = df.get(['diesIngr', 'nIngr', 'nUrg', 'estacioAny', 'diagPrinc']) # 'diagPrinc'
+    df3 = df.get(['reingres'])
+    aux2 = df2.values.tolist()
+    aux3 = df3.values.flatten().tolist()
+    dcTree = DecisionTree(aux2, aux3, [True, False], f=gini)
+    t = time.time()
+    # dcTree.autoSplit(minSetSize=100, giniReduction=0.01)
+    dcTree.splitNode(4)
+    # for son in dcTree.sons:
+    #     if gini(son.y, son.classes) > 0.38:
+    #         son.splitNode(2)
+    print(dcTree)
+    print(time.time() - t)
+    t = time.time()
+    exit(0)
 
-while True:
-    try:
-        exec(input())
-    except Exception as e:
-        print(e)
+    while True:
+        try:
+            exec(input())
+        except Exception as e:
+            print(e)
 
-ll = dcTree.predict(aux2)
-print(fScore(ll, aux3))
-print(time.time() - t)
+    ll = dcTree.predict(aux2)
+    print(fScore(ll, aux3))
+    print(time.time() - t)
 
-# y = [0.5 < random.random() for i in range(5000000)]
-# print(y.count(True))
-# t = time.clock()
-# print(gini(y, [True, False]), time.clock() - t)
+    # y = [0.5 < random.random() for i in range(5000000)]
+    # print(y.count(True))
+    # t = time.clock()
+    # print(gini(y, [True, False]), time.clock() - t)
 
-# interactive
-while True:
-    try:
-        eval(input())
-    except:
-        pass
+    # interactive
+    while True:
+        try:
+            eval(input())
+        except:
+            pass
