@@ -189,8 +189,12 @@ class EditTreeGUI:
         if len(setNodes) >= 2:
             parent = self.gui_tree.parent(setNodes[0])
             if all((self.gui_tree.parent(node) == parent for node in setNodes)):
-                pass
-        pass
+                dcTree = self.mapNode[parent]
+                joinedNode = dcTree.joinNodes([self.gui_tree.index(son) for son in setNodes])
+                for son in setNodes:
+                    self.gui_tree.delete(son)
+                idJoinedNode = self.gui_tree.insert(parent, 'end', text='joined')
+                self.mapNode[idJoinedNode] = joinedNode
 
     def prune(self, event):
         print('prunning')

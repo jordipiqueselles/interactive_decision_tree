@@ -286,7 +286,9 @@ class DecisionTree:
             # lambda x: newCondition(x) or self.sons[i].condition(x)
             newCondition = functools.partial(joinConditions, cond1=newCondition, cond2=self.sons[i].condition)
             self.sons.pop(i)
-        self.sons.append(DecisionTree(newX, newY, self.classes, self.level + 1, self.f, newCondition, self.perfKmeans, self.staticSplits))
+        joinedNode = DecisionTree(newX, newY, self.classes, self.level + 1, self.f, newCondition, self.perfKmeans, self.staticSplits)
+        self.sons.append(joinedNode)
+        return joinedNode
 
     def getSons(self):
         return self.sons
@@ -339,6 +341,12 @@ class DecisionTree:
 
     def getPrediction(self):
         return self.classes[self.classNode]
+
+    def getSegmentedData(self, attrId):
+        M = [[] for _ in self.classes]
+        for (i, elem) in enumerate(self.X):
+            M[self.classes.index(self.y[i])].append(elem[attrId])
+        return M
 
     def __str__(self):
         # La accuracy s'ha de generalitza per a datasets amb etiquetes diferents a True i False
