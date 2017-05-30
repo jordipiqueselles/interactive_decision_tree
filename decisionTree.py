@@ -328,12 +328,24 @@ class DecisionTree:
         # return [self._auxPredict(elem) for elem in X]
         return pool.map(functools.partial(self._auxPredict, bayes=bayes), X)
 
+    def getNumElems(self):
+        return len(self.y)
+
+    def getAccuracy(self):
+        return round(max([self.y.count(cl) for cl in self.classes]) / len(self.y), 4)
+
+    def getImpurity(self):
+        return round(self.f(self.y, self.classes), 4)
+
+    def getPrediction(self):
+        return self.classes[self.classNode]
+
     def __str__(self):
         # La accuracy s'ha de generalitza per a datasets amb etiquetes diferents a True i False
-        strTree = 'size: ' + str(len(self.y)) + '; Accuracy: ' + \
-                  str(round(max([self.y.count(cl) for cl in self.classes]) / len(self.y), 4)) + \
+        strTree = 'size: ' + str(self.getNumElems()) + '; Accuracy: ' + \
+                  str(self.getAccuracy()) + \
                   '; Attr split: ' + str(self.attrSplit) + '; ' + self.f.__name__ + ': ' + \
-                  str(round(self.f(self.y, self.classes), 4)) + "; Predict: " + str(self.classNode) + '\n'
+                  str(self.getImpurity()) + "; Predict: " + str(self.classNode) + '\n'
                     # posar les funcions de accuracy i altres (recall, precision...) fora de la classe i
                     # cridar-les en aquest print
         for i in range(len(self.sons)):

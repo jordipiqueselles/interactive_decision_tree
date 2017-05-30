@@ -29,6 +29,12 @@ class Language:
             self.varSplit = 'Variable split'
             self.naiveBayes = 'Naive Bayes'
 
+            self.infoNumElems = 'Number of elements: '
+            self.infoAccuray = 'Accuracy: '
+            self.infoPrediction = 'Prediction: '
+            self.infoAttrSplit = 'Variable split: '
+            self.inforImpurity = 'Gini impurity: '
+
             self.file = 'File'
             self.newTree = 'New Decision Tree'
             self.editTree = 'Edit Decision Tree'
@@ -67,20 +73,16 @@ class MyMenu:
 
     def newTree(self):
         file = fDialog.askopenfile(mode='r')
-        print(file)
-        print(file.name)
 
-        df = pd.read_csv('dadesSantPauProc.csv')
+        df = pd.read_csv(file.name)
         df2 = df.get(['diesIngr', 'nIngr', 'nUrg', 'estacioAny', 'diagPrinc']) # 'diagPrinc'
         df3 = df.get(['reingres'])
-        aux2 = df2.values.tolist()
-        aux3 = df3.values.flatten().tolist()
-        dcTree = decisionTree.DecisionTree(aux2, aux3, [True, False], f=decisionTree.gini)
-        dcTree.splitNode(4)
+        X = df2.values.tolist()
+        y = df3.values.flatten().tolist()
+        dcTree = decisionTree.DecisionTree(X, y, [True, False], f=decisionTree.gini)
 
-        print(dcTree)
-        # self.resetFrame()
-        # EditTreeGUI(self.mainFrame)
+        self.resetFrame()
+        EditTreeGUI(self.mainFrame, dcTree)
 
     def editTree(self):
         pass
@@ -99,18 +101,23 @@ class MyMenu:
         pass
 
 class EditTreeGUI:
-    def __init__(self, master):
+    def __init__(self, master, dcTree):
+        self.mapNode = dict() # diccionary that translates the id of a node in the GUI to a node from the class decisionTree
         self.master = master
+        self.dcTree = dcTree
         # Left Frame #
         leftFrame = Frame(master)
         leftFrame.pack(side=LEFT)
         # Buttons
         b_autoSplit = Button(leftFrame, text=lg.autosplit)
         b_autoSplit.pack(side=TOP)
+        b_autoSplit.bind('<Button-1>', self.autoSplit)
         b_prune = Button(leftFrame, text=lg.prune)
         b_prune.pack(side=TOP)
+        b_prune.bind('<Button-1>', self.prune)
         b_join = Button(leftFrame, text=lg.join)
         b_join.pack(side=TOP)
+        b_join.bind('<Button-1>', self.joinNodes)
 
         cb_NaiBay = Checkbutton(leftFrame, text=lg.naiveBayes)
         cb_NaiBay.pack(side=BOTTOM)
@@ -124,19 +131,25 @@ class EditTreeGUI:
         # id2 = gui_tree.insert('', 'end', text='Tutorial2')
         # id3 = gui_tree.insert(id2, 'end', text='Tutorial3')
         tree_root_id = self.gui_tree.insert('', 'end', text='Root')
+        self.mapNode[tree_root_id] = dcTree
         self.gui_tree.bind('<Button-1>', self.nodeClicked)
         self.gui_tree.pack()
 
         # Right Frame #
         rightFrame = Frame(self.master)
-        rightFrame.pack(side=RIGHT)
+        rightFrame.pack(side=RIGHT, expand=True)
         # Info
         infoFrame = Frame(rightFrame)
         infoFrame.pack(side=BOTTOM)
-        infoNumber = Label(infoFrame, text='infoNumber')
-        infoNumber.grid(row=0, column=0)
-        infoAccuracy = Label(infoFrame, text='infoAccuracy')
-        infoAccuracy.grid(row=0, column=1)
+        self.infoNumber = Label(infoFrame, text=lg.infoNumElems)
+        self.infoNumber.grid(row=0, column=0, sticky=W)
+        self.infoAccuracy = Label(infoFrame, text=lg.infoAccuray)
+        self.infoAccuracy.grid(row=0, column=1, sticky=W)
+        self.infoGini = Label(infoFrame, text=lg.inforImpurity)
+        self.infoGini.grid(row=1, column=0, sticky=W)
+        self.infoAttrSplit = Label(infoFrame, text=lg.infoAttrSplit)
+        self.infoAttrSplit.grid(row=1, column=1, sticky=W)
+        self.infoPrediction = Label(infoFrame, text=lg.infoPrediction)
 
         # prova grafic
         f = Figure(figsize=(5, 4), dpi=100)
@@ -152,7 +165,48 @@ class EditTreeGUI:
         canvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=1)
 
     def nodeClicked(self, event):
-        print(self.gui_tree.focus())
+        # print(self.gui_tree.focus())
+        dcTree = self.mapNode[self.gui_tree.focus()]
+        # dcTree = decisionTree.DecisionTree()
+        # print(dcTree)
+        self.infoNumber['text'] = lg.infoNumElems + str(dcTree.getNumElems())
+        self.infoPrediction['text'] = lg.infoPrediction + str(dcTree.getPrediction())
+        self.infoAccuracy['text'] = lg.infoAccuray + str(dcTree.getAccuracy())
+        self.infoAttrSplit['text'] = lg.infoAttrSplit + str(dcTree.attrSplit)
+        self.infoGini['text'] = lg.inforImpurity + str(dcTree.getImpurity())
+
+    def autoSplit(self, event):
+        print('Autospliting')
+        dcTree = self.mapNode[self.gui_tree.focus()]
+        dcTree.autoSplit(minSetSize=1000, giniReduction=0.01)
+        print('Autosplit completed')
+        self.addNodes(self.gui_tree.focus(), dcTree)
+        pass
+
+    def joinNodes(self, event):
+        print('joinning')
+        setNodes = self.gui_tree.selection()
+        if len(setNodes) >= 2:
+            parent = self.gui_tree.parent(setNodes[0])
+            if all((self.gui_tree.parent(node) == parent for node in setNodes)):
+                pass
+        pass
+
+    def prune(self, event):
+        print('prunning')
+        nodeGUI = self.gui_tree.focus()
+        dcTree = self.mapNode[nodeGUI]
+        dcTree.prune()
+        for node in self.gui_tree.get_children(nodeGUI):
+            self.gui_tree.delete(node)
+        pass
+
+    def addNodes(self, rootGUI, rootDT):
+        # rootDT = decisionTree.DecisionTree()
+        for (i, son) in enumerate(rootDT.getSons()):
+            idSon = self.gui_tree.insert(rootGUI, 'end', text=str(i))
+            self.mapNode[idSon] = son
+            self.addNodes(idSon, son)
 
 class PredictGUI:
     def __init__(self, master):
@@ -161,7 +215,6 @@ class PredictGUI:
         label.pack()
 
 # Important variables #
-mapNode = dict() # diccionary that translates the id of a node in the GUI to a node from the class decisionTree
 
 lg = Language()
 root = Tk()
