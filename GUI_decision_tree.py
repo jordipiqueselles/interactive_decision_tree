@@ -2,10 +2,12 @@ from tkinter import *
 import tkinter.ttk as ttk
 import tkinter.filedialog as fDialog
 import pandas as pd
+from collections import Counter
 import decisionTree
 
 import matplotlib
 matplotlib.use('TkAgg')
+import matplotlib.pyplot as plt
 from numpy import arange, sin, pi
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
 # implement the default mpl key bindings
@@ -76,13 +78,14 @@ class MyMenu:
 
         df = pd.read_csv(file.name)
         df2 = df.get(['diesIngr', 'nIngr', 'nUrg', 'estacioAny', 'diagPrinc']) # 'diagPrinc'
+        listAttr = list(df2.columns.values)
         df3 = df.get(['reingres'])
         X = df2.values.tolist()
         y = df3.values.flatten().tolist()
         dcTree = decisionTree.DecisionTree(X, y, [True, False], f=decisionTree.gini)
 
         self.resetFrame()
-        EditTreeGUI(self.mainFrame, dcTree)
+        EditTreeGUI(self.mainFrame, dcTree, listAttr)
 
     def editTree(self):
         pass
@@ -101,10 +104,11 @@ class MyMenu:
         pass
 
 class EditTreeGUI:
-    def __init__(self, master, dcTree):
+    def __init__(self, master, dcTree, listAttr):
         self.mapNode = dict() # diccionary that translates the id of a node in the GUI to a node from the class decisionTree
         self.master = master
         self.dcTree = dcTree
+        self.listAttr = listAttr
         # Left Frame #
         leftFrame = Frame(master)
         leftFrame.pack(side=LEFT)
@@ -133,6 +137,7 @@ class EditTreeGUI:
         tree_root_id = self.gui_tree.insert('', 'end', text='Root')
         self.mapNode[tree_root_id] = dcTree
         self.gui_tree.bind('<Button-1>', self.nodeClicked)
+        self.gui_tree.focus(tree_root_id)
         self.gui_tree.pack()
 
         # Right Frame #
@@ -151,18 +156,47 @@ class EditTreeGUI:
         self.infoAttrSplit.grid(row=1, column=1, sticky=W)
         self.infoPrediction = Label(infoFrame, text=lg.infoPrediction)
 
+        # Attr split frame
+        attrFrame = Frame(rightFrame)
+        attrFrame.pack(side=TOP)
+        self.tkvar = StringVar(root)
+        self.tkvar.set(self.listAttr[0]) # set the default option
+        self.tkvar.trace('w', self.optionMenuClicked)
+        self.popupMenu = OptionMenu(attrFrame, self.tkvar, *self.listAttr)
+        self.popupMenu.pack()
+
         # prova grafic
-        f = Figure(figsize=(5, 4), dpi=100)
-        a = f.add_subplot(111)
+        self.figure = Figure(figsize=(5, 4), dpi=100)
+        subPlot = self.figure.add_subplot(111)
         t = arange(0.0, 3.0, 0.01)
         s = sin(2*pi*t)
 
-        a.plot(t, s)
+        subPlot.plot(t, s)
 
         # a tk.DrawingArea
-        canvas = FigureCanvasTkAgg(f, master=rightFrame)
-        canvas.show()
-        canvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=1)
+        self.canvas = FigureCanvasTkAgg(self.figure, master=rightFrame)
+        self.canvas.show()
+        self.canvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=1)
+
+    def optionMenuClicked(self, *args):
+        selectedAttr = self.tkvar.get()
+        print(selectedAttr)
+        node = self.mapNode[self.gui_tree.focus()]
+        # node = decisionTree.DecisionTree()
+        segData = node.getSegmentedData(self.listAttr.index(selectedAttr))
+        self.figure.clear()
+        subPlot = self.figure.add_subplot(111)
+        # comprovar que les dades no sigui buides
+        if type(segData[0][0]) == int or type(segData[0][0]) == float:
+            auxHist = [0] * 30
+            for data in segData:
+                h = subPlot.hist(data, bins=30, bottom=auxHist)
+                auxHist += h[0]
+        else:
+            for data in segData:
+                c = Counter(data)
+
+        self.canvas.show()
 
     def nodeClicked(self, event):
         # print(self.gui_tree.focus())
@@ -192,6 +226,7 @@ class EditTreeGUI:
                 dcTree = self.mapNode[parent]
                 joinedNode = dcTree.joinNodes([self.gui_tree.index(son) for son in setNodes])
                 for son in setNodes:
+                    self.mapNode.pop(son)
                     self.gui_tree.delete(son)
                 idJoinedNode = self.gui_tree.insert(parent, 'end', text='joined')
                 self.mapNode[idJoinedNode] = joinedNode
@@ -202,6 +237,7 @@ class EditTreeGUI:
         dcTree = self.mapNode[nodeGUI]
         dcTree.prune()
         for node in self.gui_tree.get_children(nodeGUI):
+            self.mapNode.pop(node)
             self.gui_tree.delete(node)
         pass
 
