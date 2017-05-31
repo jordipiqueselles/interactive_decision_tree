@@ -9,6 +9,7 @@ import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 from numpy import arange, sin, pi
+import numpy as np
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
 # implement the default mpl key bindings
 from matplotlib.backend_bases import key_press_handler
@@ -193,8 +194,20 @@ class EditTreeGUI:
                 h = subPlot.hist(data, bins=30, bottom=auxHist)
                 auxHist += h[0]
         else:
+            s = set()
             for data in segData:
-                c = Counter(data)
+                s = s.union(set(data))
+            s = sorted((list(s)))
+            x = list(range(len(s)))
+            acumY = np.array([0] * len(x))
+            for data in segData:
+                aux_y = Counter(data)
+                y = [0] * len(x)
+                for (i, elem) in enumerate(s):
+                    if elem in aux_y:
+                        y[i] = aux_y[elem]
+                subPlot.bar(x, y, bottom=acumY)
+                acumY += y
 
         self.canvas.show()
 
