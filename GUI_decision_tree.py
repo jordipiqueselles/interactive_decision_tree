@@ -170,11 +170,6 @@ class TreeFrameEdit(TreeFrame):
 
     def nodeClicked(self, event):
         dcTree = self.mapNode[self.gui_tree.focus()]
-        # self.infoNumber['text'] = lg.infoNumElems + str(dcTree.getNumElems())
-        # self.infoPrediction['text'] = lg.infoPrediction + str(dcTree.getPrediction())
-        # self.infoAccuracy['text'] = lg.infoAccuray + str(dcTree.getAccuracy())
-        # self.infoAttrSplit['text'] = lg.infoAttrSplit + str(dcTree.attrSplit)
-        # self.infoGini['text'] = lg.inforImpurity + str(dcTree.getImpurity())
 
     def autoSplit(self, event):
         print('Autospliting')
@@ -252,15 +247,6 @@ class EditTreeGUI:
         # Info
         infoFrame = Frame(rightFrame)
         infoFrame.pack(side=BOTTOM)
-        self.infoNumber = Label(infoFrame, text=lg.infoNumElems)
-        self.infoNumber.grid(row=0, column=0, sticky=W)
-        self.infoAccuracy = Label(infoFrame, text=lg.infoAccuray)
-        self.infoAccuracy.grid(row=0, column=1, sticky=W)
-        self.infoGini = Label(infoFrame, text=lg.inforImpurity)
-        self.infoGini.grid(row=1, column=0, sticky=W)
-        self.infoAttrSplit = Label(infoFrame, text=lg.infoAttrSplit)
-        self.infoAttrSplit.grid(row=1, column=1, sticky=W)
-        self.infoPrediction = Label(infoFrame, text=lg.infoPrediction)
 
         # Attr split frame
         attrFrame = Frame(rightFrame)
@@ -272,7 +258,8 @@ class EditTreeGUI:
         self.popupMenu.pack()
 
         # prova grafic
-        self.figure = Figure(figsize=(5, 4), dpi=100)
+        self.figure = Figure(figsize=(7, 6), dpi=100)
+        # self.figure.add_axes()
         subPlot = self.figure.add_subplot(111)
         t = arange(0.0, 3.0, 0.01)
         s = sin(2*pi*t)
@@ -289,12 +276,12 @@ class EditTreeGUI:
         segData = self.treeFrame.getSegData(selectedAttr)
         self.figure.clear()
         subPlot = self.figure.add_subplot(111)
-        # comprovar que les dades no sigui buides
+        axes = self.figure.add_axes()
         # TODO Una mica lleig, intentar compactar el codi i fer-lo mes clar
         if type(segData[0][0]) == int or type(segData[0][0]) == float:
             auxHist = [0] * 30
-            for data in segData:
-                h = subPlot.hist(data, bins=30, bottom=auxHist)
+            for (i, data) in enumerate(segData):
+                h = subPlot.hist(data, bins=30, bottom=auxHist, label=str(self.dcTree.classes[i]))
                 auxHist += h[0]
         else:
             s = set()
@@ -303,15 +290,18 @@ class EditTreeGUI:
             s = sorted((list(s)))
             x = list(range(len(s)))
             acumY = np.array([0] * len(x))
-            for data in segData:
+            for (i, data) in enumerate(segData):
                 aux_y = Counter(data)
                 y = [0] * len(x)
-                for (i, elem) in enumerate(s):
+                for (j, elem) in enumerate(s):
                     if elem in aux_y:
-                        y[i] = aux_y[elem]
-                subPlot.bar(x, y, bottom=acumY)
+                        y[j] = aux_y[elem]
+                subPlot.bar(x, y, bottom=acumY, label=str(self.dcTree.classes[i]))
                 acumY += y
+            self.figure.axes[0].set_xticks(x)
+            self.figure.axes[0].set_xticklabels(s)
 
+        subPlot.legend()
         self.canvas.show()
 
     def saveDcTree(self, file):
