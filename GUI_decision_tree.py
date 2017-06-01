@@ -16,9 +16,6 @@ from matplotlib.backend_bases import key_press_handler
 
 from matplotlib.figure import Figure
 
-def deleteAllWidgets(master):
-    master = Tk()
-
 
 class Language:
     english = 'english'
@@ -26,34 +23,46 @@ class Language:
     catalan = 'catalan'
     def __init__(self, language=english):
         if language == Language.english:
-            self.autosplit = 'Autosplit'
-            self.prune = 'Prune'
-            self.join = 'Join'
-            self.varSplit = 'Variable split'
-            self.naiveBayes = 'Naive Bayes'
-
-            self.infoNumElems = 'Number of elements: '
-            self.infoAccuray = 'Accuracy: '
-            self.infoPrediction = 'Prediction: '
-            self.infoAttrSplit = 'Variable split: '
-            self.inforImpurity = 'Gini impurity: '
-
-            self.file = 'File'
-            self.newTree = 'New Decision Tree'
-            self.editTree = 'Edit Decision Tree'
-            self.newPrediction = 'New prediction'
-            self.saveTree = 'Save Decision Tree'
-            self.loadTree = 'Load Decision Tree'
-            self.loadDataSet = 'Load DataSet'
-
+            self.setEnglish()
         elif language == Language.spanish:
-            pass
+            self.setSpanish()
         elif language == Language.catalan:
-            pass
+            self.setCatalan()
+
+    def setEnglish(self):
+        self.autosplit = 'Autosplit'
+        self.prune = 'Prune'
+        self.join = 'Join'
+        self.varSplit = 'Variable split'
+        self.naiveBayes = 'Naive Bayes'
+
+        self.infoNumElems = 'Number of elements: '
+        self.infoAccuray = 'Accuracy: '
+        self.infoPrediction = 'Prediction: '
+        self.infoAttrSplit = 'Variable split: '
+        self.inforImpurity = 'Gini impurity: '
+
+        self.file = 'File'
+        self.newTree = 'New Decision Tree'
+        self.editTree = 'Edit Decision Tree'
+        self.newPrediction = 'New prediction'
+        self.saveTree = 'Save Decision Tree'
+        self.loadTree = 'Load Decision Tree'
+        self.loadDataSet = 'Load DataSet'
+
+    def setSpanish(self):
+        pass
+
+    def setCatalan(self):
+        pass
         
 class MyMenu:
     def __init__(self, master):
-        # Menu #
+        """
+        :param master: The root Tk window where the menu will be inserted
+        Fills the master frame with a menu. This menu can give access to the main functionalities of the application
+        as creating a decision tree or using one to predict
+        """
         self.master = master
         self.menu = Menu(self.master)
         self.mFile = Menu(self.menu)
@@ -70,21 +79,30 @@ class MyMenu:
         self.mainFrame = Frame(self.master)
 
     def resetFrame(self):
+        """
+        Destroy the main frame and all the widgets that contains. It is used to before showing a different view in
+        the same window
+        """
         self.mainFrame.destroy()
         self.mainFrame = Frame(master=self.master)
         self.mainFrame.pack()
 
     def newTree(self):
+        """
+        Shows a dialog window to choose a file and it creates a view for building a decision tree from the data of the
+        selected file
+        """
         file = fDialog.askopenfile(mode='r')
-
         df = pd.read_csv(file.name)
+
+        # TODO Aquesta part s'ha de fer general per a qualsevol tipus de DataSet
         df2 = df.get(['diesIngr', 'nIngr', 'nUrg', 'estacioAny', 'diagPrinc']) # 'diagPrinc'
         listAttr = list(df2.columns.values)
         df3 = df.get(['reingres'])
         X = df2.values.tolist()
         y = df3.values.flatten().tolist()
-        dcTree = decisionTree.DecisionTree(X, y, [True, False], f=decisionTree.gini)
 
+        dcTree = decisionTree.DecisionTree(X, y, [True, False], f=decisionTree.gini)
         self.resetFrame()
         EditTreeGUI(self.mainFrame, dcTree, listAttr)
 
@@ -106,6 +124,12 @@ class MyMenu:
 
 class EditTreeGUI:
     def __init__(self, master, dcTree, listAttr):
+        """
+        :param master:
+        :param dcTree:
+        :param listAttr:
+        :return:
+        """
         self.mapNode = dict() # diccionary that translates the id of a node in the GUI to a node from the class decisionTree
         self.master = master
         self.dcTree = dcTree

@@ -8,6 +8,7 @@ import math
 import operator
 import numpy as np
 import functools
+import pickle
 
 # Functions to evaluate the performance of a split #
 
@@ -148,8 +149,28 @@ class DecisionTree:
                 auxLL[typesCat[i].index(row[i])] = 1
                 ll += auxLL
             Xmult.append(ll)
+        # TODO join the two naive bayes predictors
         self.multNB = MultinomialNB()
         self.multNB.fit(Xmult, y)
+
+    @classmethod
+    def load(cls, path):
+        with open(path, 'rb') as input:
+            dcTree = pickle.load(input)
+        return cls.copyVarTree(dcTree)
+
+    @staticmethod
+    def copyVarTree(dcTree):
+        newDcTree = DecisionTree(X=dcTree.X, y=dcTree.y, classes=dcTree.classes, level=dcTree.level, f=dcTree.f,
+                                 condition=dcTree.condition, perfKmeans=dcTree.perfKmeans, staticSplits=dcTree.staticSplits)
+        newDcTree.classNode = dcTree.classNode
+        newDcTree.sons = [DecisionTree.copyVarTree(son) for son in dcTree.sons]
+        return newDcTree
+
+    def save(self, dcTree, path):
+        with open(path, 'wb') as output:
+            pickler = pickle.Pickler(output, -1)
+            pickler.dump(dcTree)
 
     def autoSplit(self, minSetSize=50, giniReduction=0.01):
         """
@@ -161,7 +182,7 @@ class DecisionTree:
             if gImp + giniReduction < self.f(self.y, self.classes):
                 self.splitNode(idxAttr)
                 for son in self.sons:
-                    son.autoSplit()
+                    son.autoSplit(minSetSize, giniReduction)
 
     def __generateSubsets(self, idxAttr):
         """
