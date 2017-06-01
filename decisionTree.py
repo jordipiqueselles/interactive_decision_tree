@@ -105,7 +105,7 @@ def automaticClustering(i, x, perfKmeans):
 # The main class #
 
 class DecisionTree:
-    def __init__(self, X, y, classes, level=0, f=gini, condition=alwaysTrue, perfKmeans=perfKmeanVar, staticSplits=dict()):
+    def __init__(self, X, y, classes, attrNames=[], level=0, f=gini, condition=alwaysTrue, perfKmeans=perfKmeanVar, staticSplits=dict()):
         """
         :param X: Matrix with n rows, each row representing a sample, and m columns, each column representing the attributes of the sample
         :param y: Vector of n elements, each element i representing the value that corresponds to the ith entry in the matrix X
@@ -120,7 +120,6 @@ class DecisionTree:
         self.sons = []
         self.X = X
         self.y = y
-        self.classNode = max([(self.y.count(i), i) for i in set(self.y)])[1]
         self.classes = classes
         self.level = level
         self.f = f
@@ -128,6 +127,11 @@ class DecisionTree:
         self.perfKmeans = perfKmeans
         # staticSplits ha de ser coherent i amb el format correcte. No cal que sigui exhaustiu
         self.staticSplits = staticSplits#{4: [['_001', '_140', '_240', '_280', '_290', '_320', '_360', '_390', '_460', '_520', '_580', '_630'], ['_680', '_710', '_740', '_760', '_780', '_800']]}#{2: [1,3,5,7]}
+        self.classNode = max([(self.y.count(cls), cls) for cls in self.classes])[1]
+        if len(attrNames) != len(X[0]):
+            self.attrNames = list(range(len(X[0])))
+        else:
+            self.attrNames = attrNames
 
         # Naive Bayes classifier
         self.gaussNB = GaussianNB()
@@ -161,16 +165,15 @@ class DecisionTree:
 
     @staticmethod
     def copyVarTree(dcTree):
-        newDcTree = DecisionTree(X=dcTree.X, y=dcTree.y, classes=dcTree.classes, level=dcTree.level, f=dcTree.f,
+        newDcTree = DecisionTree(X=dcTree.X, y=dcTree.y, classes=dcTree.classes, attrNames=dcTree.attrNames, level=dcTree.level, f=dcTree.f,
                                  condition=dcTree.condition, perfKmeans=dcTree.perfKmeans, staticSplits=dcTree.staticSplits)
-        newDcTree.classNode = dcTree.classNode
         newDcTree.sons = [DecisionTree.copyVarTree(son) for son in dcTree.sons]
         return newDcTree
 
-    def save(self, dcTree, path):
+    def save(self, path):
         with open(path, 'wb') as output:
             pickler = pickle.Pickler(output, -1)
-            pickler.dump(dcTree)
+            pickler.dump(self)
 
     def autoSplit(self, minSetSize=50, giniReduction=0.01):
         """
@@ -261,7 +264,7 @@ class DecisionTree:
         for elem in sorted(d.keys()):
             newX = [self.X[i] for i in d[elem][0]]
             newY = [self.y[i] for i in d[elem][0]]
-            self.sons.append(DecisionTree(newX, newY, self.classes, self.level + 1, self.f, d[elem][1], self.perfKmeans, self.staticSplits))
+            self.sons.append(DecisionTree(newX, newY, self.classes, self.attrNames, self.level + 1, self.f, d[elem][1], self.perfKmeans, self.staticSplits))
         self.attrSplit = idxAttr
 
     def _auxBestSplit(self, i):
@@ -307,7 +310,7 @@ class DecisionTree:
             # lambda x: newCondition(x) or self.sons[i].condition(x)
             newCondition = functools.partial(joinConditions, cond1=newCondition, cond2=self.sons[i].condition)
             self.sons.pop(i)
-        joinedNode = DecisionTree(newX, newY, self.classes, self.level + 1, self.f, newCondition, self.perfKmeans, self.staticSplits)
+        joinedNode = DecisionTree(newX, newY, self.classes, self.attrNames, self.level + 1, self.f, newCondition, self.perfKmeans, self.staticSplits)
         self.sons.append(joinedNode)
         return joinedNode
 
