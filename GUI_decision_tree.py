@@ -123,11 +123,26 @@ class MyMenu:
 
 
 class TreeFrame(ABC):
+    keyImpurity = "impurity"
+    keyPrediction = "prediction"
+    keyAttrSplit = "attrSplit"
     def __init__(self, master, dcTree):
-        self.mapNode = dict() # diccionary that translates the id of a node in the GUI to a node from the class decisionTree
-        self.gui_tree = ttk.Treeview(master)
-        tree_root_id = self.gui_tree.insert('', 'end', text='Root')
         self.dcTree = dcTree
+        self.master = master
+        self.mapNode = dict() # diccionary that translates the id of a node in the GUI to a node from the class decisionTree
+
+        self.gui_tree = ttk.Treeview(master)
+        self.gui_tree["columns"] = (TreeFrame.keyImpurity, TreeFrame.keyPrediction, TreeFrame.keyAttrSplit)
+        self.gui_tree.column(TreeFrame.keyImpurity, width=100)
+        self.gui_tree.column(TreeFrame.keyPrediction, width=100)
+        self.gui_tree.column(TreeFrame.keyAttrSplit, width=100)
+        self.gui_tree.heading(TreeFrame.keyImpurity, text=lg.inforImpurity)
+        self.gui_tree.heading(TreeFrame.keyPrediction, text=lg.infoPrediction)
+        self.gui_tree.heading(TreeFrame.keyAttrSplit, text=lg.infoAttrSplit)
+
+        tree_root_id = self.gui_tree.insert('', 'end', text=str(self.dcTree.getNumElems()),
+                                         values=(str(self.dcTree.getImpurity()), str(self.dcTree.getPrediction()),
+                                                 str(self.dcTree.getAttrSplit())))
         self.mapNode[tree_root_id] = dcTree
         self.addNodes(tree_root_id, dcTree)
 
@@ -136,10 +151,15 @@ class TreeFrame(ABC):
         self.gui_tree.pack()
 
     def addNodes(self, rootGUI, rootDT):
+        self.gui_tree.set(rootGUI, TreeFrame.keyAttrSplit, str(rootDT.getAttrSplit()))
         for (i, son) in enumerate(rootDT.getSons()):
-            idSon = self.gui_tree.insert(rootGUI, 'end', text=str(i))
+            idSon = self.gui_tree.insert(rootGUI, 'end', text=str(son.getNumElems()),
+                                         values=(str(son.getImpurity()), str(son.getPrediction()), str(son.getAttrSplit())))
             self.mapNode[idSon] = son
             self.addNodes(idSon, son)
+
+    def nodeClicked(self, event):
+        pass
 
 
 class TreeFrameEdit(TreeFrame):
@@ -150,11 +170,11 @@ class TreeFrameEdit(TreeFrame):
 
     def nodeClicked(self, event):
         dcTree = self.mapNode[self.gui_tree.focus()]
-        self.infoNumber['text'] = lg.infoNumElems + str(dcTree.getNumElems())
-        self.infoPrediction['text'] = lg.infoPrediction + str(dcTree.getPrediction())
-        self.infoAccuracy['text'] = lg.infoAccuray + str(dcTree.getAccuracy())
-        self.infoAttrSplit['text'] = lg.infoAttrSplit + str(dcTree.attrSplit)
-        self.infoGini['text'] = lg.inforImpurity + str(dcTree.getImpurity())
+        # self.infoNumber['text'] = lg.infoNumElems + str(dcTree.getNumElems())
+        # self.infoPrediction['text'] = lg.infoPrediction + str(dcTree.getPrediction())
+        # self.infoAccuracy['text'] = lg.infoAccuray + str(dcTree.getAccuracy())
+        # self.infoAttrSplit['text'] = lg.infoAttrSplit + str(dcTree.attrSplit)
+        # self.infoGini['text'] = lg.inforImpurity + str(dcTree.getImpurity())
 
     def autoSplit(self, event):
         print('Autospliting')
@@ -175,18 +195,20 @@ class TreeFrameEdit(TreeFrame):
                 for son in setNodes:
                     self.mapNode.pop(son)
                     self.gui_tree.delete(son)
-                idJoinedNode = self.gui_tree.insert(parent, 'end', text='joined')
+                idJoinedNode = self.gui_tree.insert(parent, 'end', text=str(joinedNode.getNumElems()),
+                                         values=(str(joinedNode.getImpurity()), str(joinedNode.getPrediction()),
+                                                 str(joinedNode.getAttrSplit())))
                 self.mapNode[idJoinedNode] = joinedNode
 
     def prune(self, event):
         print('prunning')
         nodeGUI = self.gui_tree.focus()
         dcTree = self.mapNode[nodeGUI]
+        self.gui_tree.set(nodeGUI, TreeFrame.keyAttrSplit, str(dcTree.getAttrSplit()))
         dcTree.prune()
         for node in self.gui_tree.get_children(nodeGUI):
             self.mapNode.pop(node)
             self.gui_tree.delete(node)
-        pass
 
 class TreeFramePredict(TreeFrame):
     pass

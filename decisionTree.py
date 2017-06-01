@@ -366,6 +366,12 @@ class DecisionTree:
     def getPrediction(self):
         return self.classes[self.classNode]
 
+    def getAttrSplit(self):
+        if self.attrSplit == None:
+            return None
+        else:
+            return self.attrNames[self.attrSplit]
+
     def getSegmentedData(self, attrId):
         M = [[] for _ in self.classes]
         for (i, elem) in enumerate(self.X):
