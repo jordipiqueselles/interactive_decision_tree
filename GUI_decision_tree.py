@@ -342,9 +342,11 @@ class EditTreeGUI:
         axes = self.figure.add_axes()
         # TODO Una mica lleig, intentar compactar el codi i fer-lo mes clar
         if type(segData[0][0]) == int or type(segData[0][0]) == float:
-            auxHist = [0] * 30
+            rang = (min(min(elem) for elem in segData), max(max(elem) for elem in segData))
+            nBins = min(30, max([len(set(d)) for d in segData]))
+            auxHist = [0] * nBins
             for (i, data) in enumerate(segData):
-                h = subPlot.hist(data, bins=30, bottom=auxHist, label=str(self.dcTree.classes[i]))
+                h = subPlot.hist(data, bins=nBins, range=rang, bottom=auxHist, label=str(self.dcTree.classes[i]))
                 auxHist += h[0]
         else:
             s = set()
