@@ -58,6 +58,10 @@ class Language:
         self.editTree = 'Edit Decision Tree'
         self.newPrediction = 'New prediction'
         self.saveTree = 'Save Decision Tree'
+        self.help = 'Help'
+        self.about = 'About'
+
+        self.predict = 'Predict'
 
     def setSpanish(self):
         pass
@@ -74,6 +78,7 @@ class MyMenu:
         """
         self.master = master
         self.menu = Menu(self.master)
+
         self.mFile = Menu(self.menu)
         self.mFile.add_command(label=lg.newTree, command=self.newTree)
         self.mFile.add_command(label=lg.newPrediction, command=self.newPrediction)
@@ -81,6 +86,12 @@ class MyMenu:
         self.mFile.add_command(label=lg.editTree, command=self.editTree)
         self.mFile.add_command(label=lg.saveTree, command=self.saveTree)
         self.menu.add_cascade(label=lg.file, menu=self.mFile)
+
+        self.mHelp = Menu(self.menu)
+        self.mHelp.add_command(label=lg.help, command=None)
+        self.mHelp.add_command(label=lg.about, command=None)
+        self.menu.add_cascade(label=lg.help, menu=self.mHelp)
+
         self.master.config(menu=self.menu)
 
         self.mainFrame = Frame(self.master)
@@ -104,8 +115,8 @@ class MyMenu:
         df = pd.read_csv(file.name).sample(frac=1)
 
         # TODO Aquesta part s'ha de fer general per a qualsevol tipus de DataSet
-        df2 = df.get(['diesIngr', 'nIngr', 'nUrg', 'estacioAny', 'diagPrinc']) # 'diagPrinc'
-        df3 = df.get(['reingres'])
+        df2 = df.iloc[:,:len(df.columns)-1]
+        df3 = df.iloc[:,len(df.columns)-1]
         X = df2.values.tolist()
         y = df3.values.flatten().tolist()
         nTrain = round(0.7 * len(y))
@@ -116,7 +127,9 @@ class MyMenu:
 
     def newPrediction(self):
         file = fDialog.askopenfile(mode='r')
-        dcTree = decisionTree.DecisionTree.load(file.name)
+        with open(file.name, 'rb') as input_:
+            auxDcTree = pickle.load(input_)
+            dcTree = decisionTree.DecisionTree.copyVarTree(auxDcTree)
         self.resetFrame()
         self.currentView = PredictGUI(self.mainFrame, dcTree)
 
@@ -149,7 +162,7 @@ class TreeFrame(ABC):
         self.parent = parent
         self.mapNode = dict() # diccionary that translates the id of a node in the GUI to a node from the class decisionTree
 
-        self.gui_tree = ttk.Treeview(master)
+        self.gui_tree = ttk.Treeview(master, height=30)
         self.gui_tree["columns"] = (TreeFrame.keyImpurity, TreeFrame.keyPrediction, TreeFrame.keyAttrSplit)
         self.gui_tree.column(TreeFrame.keyImpurity, width=100)
         self.gui_tree.column(TreeFrame.keyPrediction, width=100)
@@ -389,12 +402,41 @@ class InfoBestSplits:
 class PredictGUI:
     def __init__(self, master, dcTree):
         self.master = master
-        # Central Frame #
-        centralFrame = Frame(self.master)
-        centralFrame.pack(side=LEFT)
+        # Left Frame #
+        leftFrame = Frame(self.master)
+        leftFrame.pack(side=LEFT)
         # Tree
         self.dcTree = dcTree
-        self.treeFrame = TreeFramePredict(centralFrame, dcTree, self)
+        self.treeFrame = TreeFramePredict(leftFrame, dcTree, self)
+
+        # Right frame
+        rightFrame = Frame(self.master, width=100)
+        rightFrame.pack(side=TOP)
+        self.listEntries = []
+        for (i, attr) in enumerate(self.dcTree.attrNames):
+            Label(rightFrame, text=str(attr)).grid(row=0, column=i, sticky=N)
+            entry = Entry(rightFrame, width=15)
+            entry.grid(row=1, column=i, sticky=N)
+            self.listEntries.append(entry)
+        Label(rightFrame, text=lg.infoPrediction).grid(row=0, column=len(self.dcTree.attrNames), sticky=N)
+        self.labelPred = Label(rightFrame, text='-')
+        self.labelPred.grid(row=1, column=len(self.dcTree.attrNames), sticky=N)
+
+        self.b_predict = Button(rightFrame, text=lg.predict)
+        self.b_predict.bind('<Button-1>', self.predict)
+        self.b_predict.grid(row=2)
+
+    def predict(self, event):
+        ll = []
+        for l_attr in self.listEntries:
+            str_attr = l_attr.get()
+            try:
+                ll.append(float(str_attr))
+            except ValueError:
+                ll.append(str_attr)
+        result = self.dcTree.predict(ll, False)
+        print(result[0])
+        self.labelPred['text'] = str(result[0])
 
 # Important variables #
 
