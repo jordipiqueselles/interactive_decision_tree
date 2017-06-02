@@ -1,3 +1,4 @@
+from functools import partial
 from tkinter import *
 import tkinter.ttk as ttk
 import tkinter.filedialog as fDialog
@@ -8,6 +9,7 @@ import decisionTree
 from abc import ABC
 import functools
 import math
+import pickle
 
 import matplotlib
 matplotlib.use('TkAgg')
@@ -126,9 +128,13 @@ class MyMenu:
 
     def editTree(self):
         file = fDialog.askopenfile(mode='r')
-        dcTree = decisionTree.DecisionTree.load(file.name)
+        with open(file.name, 'rb') as input_:
+            auxDcTree = pickle.load(input_)
+            X_cv = auxDcTree.X_cv
+            y_cv = auxDcTree.y_cv
+            dcTree = decisionTree.DecisionTree.copyVarTree(auxDcTree)
         self.resetFrame()
-        self.currentView = EditTreeGUI(self.mainFrame, dcTree)
+        self.currentView = EditTreeGUI(self.mainFrame, dcTree, X_cv, y_cv)
 
 
 class TreeFrame(ABC):
@@ -294,8 +300,6 @@ class EditTreeGUI:
         b_split = Button(buttonsFrame, text=lg.split)
         b_split.grid(row=1, column=3)
         b_split.bind('<Button-1>', self.split)
-
-
         # cb_NaiBay = Checkbutton(buttonsFrame, text=lg.naiveBayes)
         # cb_NaiBay.pack(side=BOTTOM)
 
@@ -304,17 +308,11 @@ class EditTreeGUI:
         rightFrame.pack(side=RIGHT, expand=True)
         # prova grafic
         self.figure = Figure(figsize=(7, 6), dpi=100)
-        # self.figure.add_axes()
-        subPlot = self.figure.add_subplot(111)
-        t = arange(0.0, 3.0, 0.01)
-        s = sin(2*pi*t)
-
-        subPlot.plot(t, s)
-
         # a tk.DrawingArea
         self.canvas = FigureCanvasTkAgg(self.figure, master=rightFrame)
         self.canvas.show()
         self.canvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=1)
+        self.changePlot()
 
     def split(self, event):
         selectedAttr = self.tkvar.get()
@@ -370,7 +368,12 @@ class EditTreeGUI:
         self.canvas.show()
 
     def saveDcTree(self, file):
-        self.dcTree.save(file)
+        self.dcTree.X_cv = self.X_cv
+        self.dcTree.y_cv = self.y_cv
+        with open(file, 'wb') as output:
+            pickler = pickle.Pickler(output, -1)
+            pickler.dump(self.dcTree)
+
 
 class InfoBestSplits:
     def __init__(self, listSplits):

@@ -157,23 +157,13 @@ class DecisionTree:
         self.multNB = MultinomialNB()
         self.multNB.fit(Xmult, y)
 
-    @classmethod
-    def load(cls, path):
-        with open(path, 'rb') as input:
-            dcTree = pickle.load(input)
-        return cls.copyVarTree(dcTree)
-
     @staticmethod
     def copyVarTree(dcTree):
         newDcTree = DecisionTree(X=dcTree.X, y=dcTree.y, classes=dcTree.classes, attrNames=dcTree.attrNames, level=dcTree.level, f=dcTree.f,
                                  condition=dcTree.condition, perfKmeans=dcTree.perfKmeans, staticSplits=dcTree.staticSplits)
+        newDcTree.attrSplit = dcTree.attrSplit
         newDcTree.sons = [DecisionTree.copyVarTree(son) for son in dcTree.sons]
         return newDcTree
-
-    def save(self, path):
-        with open(path, 'wb') as output:
-            pickler = pickle.Pickler(output, -1)
-            pickler.dump(self)
 
     def autoSplit(self, minSetSize=50, giniReduction=0.01):
         """
