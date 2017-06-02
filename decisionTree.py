@@ -257,6 +257,7 @@ class DecisionTree:
     def splitNode(self, idxAttr):
         """
         :param idxAttr: Index of the attribute used to split the node
+        :return: The list of sons created
         Splits the tree given an attribute
         """
         self.sons = list() # delete all previous sons
@@ -266,6 +267,7 @@ class DecisionTree:
             newY = [self.y[i] for i in d[elem][0]]
             self.sons.append(DecisionTree(newX, newY, self.classes, self.attrNames, self.level + 1, self.f, d[elem][1], self.perfKmeans, self.staticSplits))
         self.attrSplit = idxAttr
+        return self.sons
 
     def _auxBestSplit(self, i):
         """
@@ -364,7 +366,7 @@ class DecisionTree:
         return round(self.f(self.y, self.classes), 4)
 
     def getPrediction(self):
-        return self.classes[self.classNode]
+        return self.classNode
 
     def getAttrSplit(self):
         if self.attrSplit == None:

@@ -1,10 +1,13 @@
 from tkinter import *
 import tkinter.ttk as ttk
 import tkinter.filedialog as fDialog
+import tkinter.messagebox as tkMessageBox
 import pandas as pd
 from collections import Counter
 import decisionTree
 from abc import ABC
+import functools
+import math
 
 import matplotlib
 matplotlib.use('TkAgg')
@@ -34,6 +37,10 @@ class Language:
         self.autosplit = 'Autosplit'
         self.prune = 'Prune'
         self.join = 'Join'
+        self.split = 'Split'
+        self.bestSplit = 'Best split'
+        self.adOptions = 'Advanced options'
+        self.validate = 'Validate'
         self.varSplit = 'Variable split'
         self.naiveBayes = 'Naive Bayes'
 
@@ -42,6 +49,7 @@ class Language:
         self.infoPrediction = 'Prediction: '
         self.infoAttrSplit = 'Variable split: '
         self.inforImpurity = 'Gini impurity: '
+        self.accuracy = 'Accuracy: '
 
         self.file = 'File'
         self.newTree = 'New Decision Tree'
@@ -91,17 +99,18 @@ class MyMenu:
         selected file
         """
         file = fDialog.askopenfile(mode='r')
-        df = pd.read_csv(file.name)
+        df = pd.read_csv(file.name).sample(frac=1)
 
         # TODO Aquesta part s'ha de fer general per a qualsevol tipus de DataSet
         df2 = df.get(['diesIngr', 'nIngr', 'nUrg', 'estacioAny', 'diagPrinc']) # 'diagPrinc'
         df3 = df.get(['reingres'])
         X = df2.values.tolist()
         y = df3.values.flatten().tolist()
+        nTrain = round(0.7 * len(y))
 
-        dcTree = decisionTree.DecisionTree(X, y, [True, False], f=decisionTree.gini, attrNames=list(df2.columns))
+        dcTree = decisionTree.DecisionTree(X[:nTrain], y[:nTrain], [True, False], f=decisionTree.gini, attrNames=list(df2.columns))
         self.resetFrame()
-        self.currentView = EditTreeGUI(self.mainFrame, dcTree)
+        self.currentView = EditTreeGUI(self.mainFrame, dcTree, X[nTrain:], y[nTrain:])
 
     def newPrediction(self):
         file = fDialog.askopenfile(mode='r')
@@ -123,12 +132,15 @@ class MyMenu:
 
 
 class TreeFrame(ABC):
+    # tree.tag_configure('ttk', background='yellow')
+    # tree.tag_bind('ttk', '<1>', itemClicked)
     keyImpurity = "impurity"
     keyPrediction = "prediction"
     keyAttrSplit = "attrSplit"
-    def __init__(self, master, dcTree):
+    def __init__(self, master, dcTree, parent, packSide=BOTTOM):
         self.dcTree = dcTree
         self.master = master
+        self.parent = parent
         self.mapNode = dict() # diccionary that translates the id of a node in the GUI to a node from the class decisionTree
 
         self.gui_tree = ttk.Treeview(master)
@@ -148,7 +160,7 @@ class TreeFrame(ABC):
 
         self.gui_tree.bind('<Button-1>', self.nodeClicked)
         self.gui_tree.focus(tree_root_id)
-        self.gui_tree.pack()
+        self.gui_tree.pack(side=packSide)
 
     def addNodes(self, rootGUI, rootDT):
         self.gui_tree.set(rootGUI, TreeFrame.keyAttrSplit, str(rootDT.getAttrSplit()))
@@ -160,6 +172,9 @@ class TreeFrame(ABC):
 
     def nodeClicked(self, event):
         pass
+
+    def predict_cv(self, X, naiveBayes):
+        return self.dcTree.predict(X, naiveBayes)
 
 
 class TreeFrameEdit(TreeFrame):
@@ -205,11 +220,26 @@ class TreeFrameEdit(TreeFrame):
             self.mapNode.pop(node)
             self.gui_tree.delete(node)
 
+    def split(self, idxAttr):
+        nodeGUI = self.gui_tree.focus()
+        dcTree = self.mapNode[nodeGUI]
+        dcTree.splitNode(idxAttr)
+        self.addNodes(nodeGUI, dcTree)
+
+    def bestSplit(self):
+        nodeGUI = self.gui_tree.focus()
+        dcTree = self.mapNode[nodeGUI]
+        return dcTree.bestSplit()
+
+    def nodeClicked(self, event):
+        self.parent.changePlot()
+
+
 class TreeFramePredict(TreeFrame):
     pass
 
 class EditTreeGUI:
-    def __init__(self, master, dcTree):
+    def __init__(self, master, dcTree, X_cv, y_cv):
         """
         :param master:
         :param dcTree:
@@ -217,46 +247,61 @@ class EditTreeGUI:
         """
         self.master = master
         self.dcTree = dcTree
+        self.X_cv = X_cv
+        self.y_cv = y_cv
 
         # Central Frame #
         centralFrame = Frame(self.master)
         centralFrame.pack(side=LEFT)
         # Tree
-        self.treeFrame = TreeFrameEdit(centralFrame, self.dcTree)
+        self.treeFrame = TreeFrameEdit(centralFrame, self.dcTree, self)
 
-        # Left Frame #
-        leftFrame = Frame(master)
-        leftFrame.pack(side=LEFT)
+        # Buttons Frame #
+        buttonsFrame = Frame(centralFrame)
+        buttonsFrame.pack(side=TOP)
         # Buttons
-        b_autoSplit = Button(leftFrame, text=lg.autosplit)
-        b_autoSplit.pack(side=TOP)
-        b_autoSplit.bind('<Button-1>', self.treeFrame.autoSplit)
-        b_prune = Button(leftFrame, text=lg.prune)
-        b_prune.pack(side=TOP)
+        # Button validate
+        b_validate = Button(buttonsFrame, text=lg.validate)
+        b_validate.grid(row=0, column=0)
+        b_validate.bind('<Button-1>', self.predict_cv)
+        # Button advanced options
+        b_adOptions = Button(buttonsFrame, text=lg.adOptions)
+        b_adOptions.grid(row=1, column=0)
+        b_adOptions.bind('<Button-1>', None)
+        # Button prune
+        b_prune = Button(buttonsFrame, text=lg.prune)
+        b_prune.grid(row=0, column=1)
         b_prune.bind('<Button-1>', self.treeFrame.prune)
-        b_join = Button(leftFrame, text=lg.join)
-        b_join.pack(side=TOP)
+        # Button join
+        b_join = Button(buttonsFrame, text=lg.join)
+        b_join.grid(row=1, column=1)
         b_join.bind('<Button-1>', self.treeFrame.joinNodes)
+        # Button autosplit
+        b_autoSplit = Button(buttonsFrame, text=lg.autosplit)
+        b_autoSplit.grid(row=0, column=2)
+        b_autoSplit.bind('<Button-1>', self.treeFrame.autoSplit)
+        # Button best split
+        b_bestSplit = Button(buttonsFrame, text=lg.bestSplit)
+        b_bestSplit.grid(row=1, column=2)
+        b_bestSplit.bind('<Button-1>', self.bestSplit)
+        # Option Menu
+        self.tkvar = StringVar(root)
+        self.tkvar.set(self.dcTree.attrNames[0]) # set the default option
+        self.tkvar.trace('w', self.optionMenuClicked)
+        self.popupMenu = OptionMenu(buttonsFrame, self.tkvar, *self.dcTree.attrNames)
+        self.popupMenu.grid(row=0, column=3)
+        # Button best split
+        b_split = Button(buttonsFrame, text=lg.split)
+        b_split.grid(row=1, column=3)
+        b_split.bind('<Button-1>', self.split)
 
-        cb_NaiBay = Checkbutton(leftFrame, text=lg.naiveBayes)
-        cb_NaiBay.pack(side=BOTTOM)
+
+        # cb_NaiBay = Checkbutton(buttonsFrame, text=lg.naiveBayes)
+        # cb_NaiBay.pack(side=BOTTOM)
 
         # Right Frame #
         rightFrame = Frame(self.master)
         rightFrame.pack(side=RIGHT, expand=True)
-        # Info
-        infoFrame = Frame(rightFrame)
-        infoFrame.pack(side=BOTTOM)
-
-        # Attr split frame
-        attrFrame = Frame(rightFrame)
-        attrFrame.pack(side=TOP)
-        self.tkvar = StringVar(root)
-        self.tkvar.set(self.dcTree.attrNames[0]) # set the default option
-        self.tkvar.trace('w', self.optionMenuClicked)
-        self.popupMenu = OptionMenu(attrFrame, self.tkvar, *self.dcTree.attrNames)
-        self.popupMenu.pack()
-
         # prova grafic
         self.figure = Figure(figsize=(7, 6), dpi=100)
         # self.figure.add_axes()
@@ -271,7 +316,25 @@ class EditTreeGUI:
         self.canvas.show()
         self.canvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=1)
 
+    def split(self, event):
+        selectedAttr = self.tkvar.get()
+        idxAttr = self.dcTree.attrNames.index(selectedAttr)
+        self.treeFrame.split(idxAttr)
+
+    def bestSplit(self, event):
+        listSplits = self.treeFrame.bestSplit()
+        listSplits = [(gImp, self.dcTree.attrNames[i]) for (gImp, i) in listSplits]
+        InfoBestSplits(listSplits)
+
+    def predict_cv(self, event):
+        pred_y = self.treeFrame.predict_cv(self.X_cv, False)
+        accuracy = sum([elem[0] == elem[1] for elem in zip(self.y_cv, pred_y)]) / len(self.y_cv)
+        tkMessageBox.showinfo('', lg.accuracy + str(round(accuracy, 4)))
+
     def optionMenuClicked(self, *args):
+        self.changePlot()
+
+    def changePlot(self):
         selectedAttr = self.tkvar.get()
         segData = self.treeFrame.getSegData(selectedAttr)
         self.figure.clear()
@@ -307,6 +370,17 @@ class EditTreeGUI:
     def saveDcTree(self, file):
         self.dcTree.save(file)
 
+class InfoBestSplits:
+    def __init__(self, listSplits):
+        root = Tk()
+        root.title(lg.bestSplit)
+        for (i, (gImp, attr)) in enumerate(listSplits):
+            labelAttr = Label(root, text=attr, borderwidth=1)
+            labelAttr.grid(row=i, column=0)
+            labelGImp = Label(root, text=str(round(gImp, 4)), borderwidth=1)
+            labelGImp.grid(row=i, column=1)
+        root.mainloop()
+
 class PredictGUI:
     def __init__(self, master, dcTree):
         self.master = master
@@ -315,12 +389,14 @@ class PredictGUI:
         centralFrame.pack(side=LEFT)
         # Tree
         self.dcTree = dcTree
-        self.treeFrame = TreeFrameEdit(centralFrame, dcTree)
+        self.treeFrame = TreeFramePredict(centralFrame, dcTree, self)
 
 # Important variables #
 
 lg = Language()
 root = Tk()
+w, h = root.winfo_screenwidth(), root.winfo_screenheight()
+root.geometry("%dx%d+0+0" % (w, h))
 menu = MyMenu(root)
 
 # editTree = EditTree(root)
