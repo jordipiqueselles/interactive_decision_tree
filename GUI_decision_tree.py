@@ -62,6 +62,22 @@ class Language:
         self.about = 'About'
 
         self.predict = 'Predict'
+        self.advOptions = 'Advanced options for '
+        self.minSetSize = 'Min dataset size'
+        self.minImpReduction = 'Min impurity reduction'
+        self.fImp = 'Function impurity'
+        self.fPerfKmeans = 'Performance Kmeans'
+        self.variable = 'Variable'
+        self.howToSplit = 'How to split'
+        self.accept = 'Accept'
+        self.cancel = 'Cancel'
+        self.yesNo = 'Yes/No'
+
+        self.gini = 'Gini'
+        self.entropy = 'Entropy'
+        self.silhouette = 'Silhouette'
+        self.varRed = 'Variance reduction'
+        self.error = 'Error'
 
     def setSpanish(self):
         pass
@@ -114,7 +130,6 @@ class MyMenu:
         file = fDialog.askopenfile(mode='r')
         df = pd.read_csv(file.name).sample(frac=1)
 
-        # TODO Aquesta part s'ha de fer general per a qualsevol tipus de DataSet
         df2 = df.iloc[:,:len(df.columns)-1]
         df3 = df.iloc[:,len(df.columns)-1]
         X = df2.values.tolist()
@@ -171,14 +186,14 @@ class TreeFrame(ABC):
         self.gui_tree.heading(TreeFrame.keyPrediction, text=lg.infoPrediction)
         self.gui_tree.heading(TreeFrame.keyAttrSplit, text=lg.infoAttrSplit)
 
-        tree_root_id = self.gui_tree.insert('', 'end', text=str(self.dcTree.getNumElems()),
+        self.tree_root_id = self.gui_tree.insert('', 'end', text=str(self.dcTree.getNumElems()),
                                          values=(str(self.dcTree.getImpurity()), str(self.dcTree.getPrediction()),
                                                  str(self.dcTree.getAttrSplit())))
-        self.mapNode[tree_root_id] = dcTree
-        self.addNodes(tree_root_id, dcTree)
+        self.mapNode[self.tree_root_id] = dcTree
+        self.addNodes(self.tree_root_id, dcTree)
 
         self.gui_tree.bind('<Button-1>', self.nodeClicked)
-        self.gui_tree.focus(tree_root_id)
+        self.gui_tree.focus(self.tree_root_id)
         self.gui_tree.pack(side=packSide)
 
     def addNodes(self, rootGUI, rootDT):
@@ -188,6 +203,11 @@ class TreeFrame(ABC):
                                          values=(str(son.getImpurity()), str(son.getPrediction()), str(son.getAttrSplit())))
             self.mapNode[idSon] = son
             self.addNodes(idSon, son)
+
+    def refreshInfoNodes(self, rootGUI, rootDT):
+        self.gui_tree.set(rootGUI, TreeFrame.keyImpurity, str(rootDT.getImpurity()))
+        for (i, son) in enumerate(rootDT.getSons()):
+            self.refreshInfoNodes(self.gui_tree.get_children(rootGUI)[i], son)
 
     def nodeClicked(self, event):
         pass
@@ -205,10 +225,11 @@ class TreeFrameEdit(TreeFrame):
     def nodeClicked(self, event):
         dcTree = self.mapNode[self.gui_tree.focus()]
 
-    def autoSplit(self, event):
+    def autoSplit(self, minSetSize, giniReduction):
+        self.prune()
         print('Autospliting')
         dcTree = self.mapNode[self.gui_tree.focus()]
-        dcTree.autoSplit(minSetSize=1000, giniReduction=0.01)
+        dcTree.autoSplit(minSetSize=minSetSize, giniReduction=giniReduction)
         print('Autosplit completed')
         self.addNodes(self.gui_tree.focus(), dcTree)
         pass
@@ -229,7 +250,7 @@ class TreeFrameEdit(TreeFrame):
                                                  str(joinedNode.getAttrSplit())))
                 self.mapNode[idJoinedNode] = joinedNode
 
-    def prune(self, event):
+    def prune(self):
         print('prunning')
         nodeGUI = self.gui_tree.focus()
         dcTree = self.mapNode[nodeGUI]
@@ -240,6 +261,7 @@ class TreeFrameEdit(TreeFrame):
             self.gui_tree.delete(node)
 
     def split(self, idxAttr):
+        self.prune()
         nodeGUI = self.gui_tree.focus()
         dcTree = self.mapNode[nodeGUI]
         dcTree.splitNode(idxAttr)
@@ -268,6 +290,9 @@ class EditTreeGUI:
         self.dcTree = dcTree
         self.X_cv = X_cv
         self.y_cv = y_cv
+        self.minSetSize = 1000
+        self.minImpRed = 0.01
+        self.naiveBayes = False
 
         # Central Frame #
         centralFrame = Frame(self.master)
@@ -286,11 +311,11 @@ class EditTreeGUI:
         # Button advanced options
         b_adOptions = Button(buttonsFrame, text=lg.adOptions)
         b_adOptions.grid(row=1, column=0)
-        b_adOptions.bind('<Button-1>', None)
+        b_adOptions.bind('<Button-1>', self.advancedOptions)
         # Button prune
         b_prune = Button(buttonsFrame, text=lg.prune)
         b_prune.grid(row=0, column=1)
-        b_prune.bind('<Button-1>', self.treeFrame.prune)
+        b_prune.bind('<Button-1>', self.prune)
         # Button join
         b_join = Button(buttonsFrame, text=lg.join)
         b_join.grid(row=1, column=1)
@@ -298,7 +323,7 @@ class EditTreeGUI:
         # Button autosplit
         b_autoSplit = Button(buttonsFrame, text=lg.autosplit)
         b_autoSplit.grid(row=0, column=2)
-        b_autoSplit.bind('<Button-1>', self.treeFrame.autoSplit)
+        b_autoSplit.bind('<Button-1>', self.autoSplit)
         # Button best split
         b_bestSplit = Button(buttonsFrame, text=lg.bestSplit)
         b_bestSplit.grid(row=1, column=2)
@@ -327,6 +352,12 @@ class EditTreeGUI:
         self.canvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=1)
         self.changePlot()
 
+    def prune(self, event):
+        self.treeFrame.prune()
+
+    def autoSplit(self, event):
+        self.treeFrame.autoSplit(self.minSetSize, self.minImpRed)
+
     def split(self, event):
         selectedAttr = self.tkvar.get()
         idxAttr = self.dcTree.attrNames.index(selectedAttr)
@@ -338,7 +369,7 @@ class EditTreeGUI:
         InfoBestSplits(listSplits)
 
     def predict_cv(self, event):
-        pred_y = self.treeFrame.predict_cv(self.X_cv, False)
+        pred_y = self.treeFrame.predict_cv(self.X_cv, self.naiveBayes)
         accuracy = sum([elem[0] == elem[1] for elem in zip(self.y_cv, pred_y)]) / len(self.y_cv)
         tkMessageBox.showinfo('', lg.accuracy + str(round(accuracy, 4)))
 
@@ -386,18 +417,145 @@ class EditTreeGUI:
         with open(file, 'wb') as output:
             pickler = pickle.Pickler(output, -1)
             pickler.dump(self.dcTree)
+            
+    def advancedOptions(self, event):
+        AdvancedOptionsGUI(self, self.dcTree)
 
+    def receiveChanges(self, minSetSize, minImpRed, naiveBayes):
+        self.minSetSize = minSetSize
+        self.minImpRed = minImpRed
+        self.naiveBayes = naiveBayes
+        self.treeFrame.refreshInfoNodes(self.treeFrame.tree_root_id, self.treeFrame.dcTree)
+
+class AdvancedOptionsGUI:
+    def __init__(self, frameParent, dcTree):
+        self.frameParent = frameParent
+        self.dcTree = dcTree
+        self.lAttr = dcTree.attrNames
+        self.root = Tk()
+        self.root.title(lg.advOptions)
+        
+        topFrame = Frame(self.root)
+        topFrame.pack(side=TOP)
+        # MinSetSize
+        Label(topFrame, text=lg.minSetSize).grid(row=0, column=0)
+        self.eMinSetSize = Entry(topFrame)
+        self.eMinSetSize.grid(row=0, column=1)
+        self.eMinSetSize.insert(END, str(self.frameParent.minSetSize))
+        # MinGiniReduction
+        Label(topFrame, text=lg.minImpReduction).grid(row=1, column=0)
+        self.eMinImpReduction = Entry(topFrame)
+        self.eMinImpReduction.grid(row=1, column=1)
+        self.eMinImpReduction.insert(END, str(self.frameParent.minImpRed))
+        # f_imp
+        Label(topFrame, text=lg.fImp).grid(row=2, column=0)
+        self.tkvarFImp = StringVar(topFrame)
+        if self.dcTree.f == decisionTree.gini:
+            self.tkvarFImp.set(lg.gini) # set the default option
+        elif self.dcTree.f == decisionTree.entropy:
+            self.tkvarFImp.set(lg.entropy) # set the default option
+        self.tkvarFImp.trace('w', self.fImpSelected)
+        self.menuFImp = OptionMenu(topFrame, self.tkvarFImp, *[lg.gini, lg.entropy])
+        self.menuFImp.grid(row=2, column=1)
+        # f_Kmeans
+        Label(topFrame, text=lg.fPerfKmeans).grid(row=3, column=0)
+        self.tkvarFKmeans = StringVar(topFrame)
+        if self.dcTree.perfKmeans == decisionTree.silhouette_score:
+            self.tkvarFKmeans.set(lg.silhouette) # set the default option
+        elif self.dcTree.perfKmeans == decisionTree.perfKmeanVar:
+            self.tkvarFKmeans.set(lg.varRed) # set the default option
+        self.tkvarFKmeans.trace('w', self.fImpSelected)
+        self.menuFKmeans = OptionMenu(topFrame, self.tkvarFKmeans, *[lg.silhouette, lg.varRed])
+        self.menuFKmeans.grid(row=3, column=1)
+        # Naive Bayes
+        Label(topFrame, text=lg.naiveBayes).grid(row=4, column=0)
+        self.varNB = IntVar(topFrame)
+        self.naiveBayes = Checkbutton(topFrame, text=lg.yesNo, variable=self.varNB, command=self.cb)
+        self.naiveBayes.grid(row=4, column=1)
+        self.varNB.set(self.frameParent.naiveBayes)
+        
+        middleFrame = Frame(self.root)
+        middleFrame.pack(side=TOP)
+        Label(middleFrame, text=lg.variable).grid(row=0, column=0)
+        Label(middleFrame, text=lg.howToSplit).grid(row=0, column=1)
+        self.lHowToSplit = []
+        for (i, attrName) in enumerate(self.lAttr):
+            Label(middleFrame, text=attrName).grid(row=i+1, column=0)
+            entryHowToSplit = Entry(middleFrame)
+            entryHowToSplit.grid(row=i+1, column=1)
+            if i in self.dcTree.staticSplits:
+                entryHowToSplit.insert(END, str(self.dcTree.staticSplits[i]))
+            self.lHowToSplit.append(entryHowToSplit)
+        
+        bottomFrame = Frame(self.root)
+        bottomFrame.pack(side=BOTTOM)
+        self.b_accept = Button(bottomFrame, text=lg.accept)
+        self.b_accept.bind('<Button-1>', self.accept)
+        self.b_accept.grid(row=0, column=0)
+        self.b_cancel = Button(bottomFrame, text=lg.cancel)
+        self.b_cancel.bind('<Button-1>', self.cancel)
+        self.b_cancel.grid(row=0, column=1)
+
+        self.root.mainloop()
+        
+    def fImpSelected(self, *args):
+        pass
+
+    def cb(self):
+        print(self.varNB.get())
+
+    def accept(self, event):
+        # parse minSetSize
+        try:
+            minSetSize = int(self.eMinSetSize.get())
+            if minSetSize <= 0:
+                self.throwError()
+        except ValueError:
+            self.throwError()
+        # parse minGiniReduction
+        try:
+            minGiniRed = float(self.eMinImpReduction.get())
+            if minGiniRed < 0:
+                self.throwError()
+        except ValueError:
+            self.throwError()
+        # parse attrSplit
+        dictHowToSplit = dict()
+        for (i, auxEntry) in enumerate(self.lHowToSplit):
+            if auxEntry.get() != '':
+                dictHowToSplit[i] = eval(auxEntry.get())
+
+        # set the new values to the dcTree
+        if self.tkvarFImp.get() == lg.gini:
+            self.dcTree.f = decisionTree.gini
+        elif self.tkvarFImp.get() == lg.entropy:
+            self.dcTree.f = decisionTree.entropy
+        if self.tkvarFKmeans.get() == lg.silhouette:
+            self.dcTree.perfKmeans = decisionTree.silhouette_score
+        elif self.tkvarFKmeans.get() == lg.varRed:
+            self.dcTree.perfKmeans = decisionTree.perfKmeanVar
+        self.dcTree.staticSplits = dictHowToSplit
+        self.dcTree.propagateChanges()
+        self.frameParent.receiveChanges(minSetSize, minGiniRed, self.varNB.get())
+
+        self.root.destroy()
+
+    def cancel(self, event):
+        self.root.destroy()
+
+    def throwError(self):
+        tkMessageBox.showerror(lg.error, lg.error)
 
 class InfoBestSplits:
     def __init__(self, listSplits):
-        root = Tk()
-        root.title(lg.bestSplit)
+        self.root = Tk()
+        self.root.title(lg.bestSplit)
         for (i, (gImp, attr)) in enumerate(listSplits):
-            labelAttr = Label(root, text=attr, borderwidth=1)
+            labelAttr = Label(self.root, text=attr, borderwidth=1)
             labelAttr.grid(row=i, column=0)
-            labelGImp = Label(root, text=str(round(gImp, 4)), borderwidth=1)
+            labelGImp = Label(self.root, text=str(round(gImp, 4)), borderwidth=1)
             labelGImp.grid(row=i, column=1)
-        root.mainloop()
+        self.root.mainloop()
 
 class PredictGUI:
     def __init__(self, master, dcTree):

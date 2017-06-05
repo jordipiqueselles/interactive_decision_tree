@@ -331,6 +331,7 @@ class DecisionTree:
                     t = True
                     break
         if bayes:
+            # TODO combine both Naive Bayes predictors and divide the variables between numerical and categorical
             return currentNode.gaussNB.predict(elem)
         else:
             return currentNode.classNode
@@ -369,6 +370,12 @@ class DecisionTree:
         for (i, elem) in enumerate(self.X):
             M[self.classes.index(self.y[i])].append(elem[attrId])
         return M
+
+    def propagateChanges(self):
+        for son in self.sons:
+            son.f = self.f
+            son.perfKmeans = self.perfKmeans
+            son.staticSplits = self.staticSplits
 
     def __str__(self):
         # La accuracy s'ha de generalitza per a datasets amb etiquetes diferents a True i False
