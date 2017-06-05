@@ -127,7 +127,7 @@ class DecisionTree:
         self.perfKmeans = perfKmeans
         # staticSplits ha de ser coherent i amb el format correcte. No cal que sigui exhaustiu
         self.staticSplits = staticSplits#{4: [['_001', '_140', '_240', '_280', '_290', '_320', '_360', '_390', '_460', '_520', '_580', '_630'], ['_680', '_710', '_740', '_760', '_780', '_800']]}#{2: [1,3,5,7]}
-        self.classNode = max([(self.y.count(cls), cls) for cls in self.classes])[1]
+        self.classNode = [(round(self.y.count(cls)/len(y), 3), cls) for cls in self.classes]
         if len(attrNames) != len(X[0]):
             self.attrNames = list(range(len(X[0])))
         else:
@@ -339,7 +339,7 @@ class DecisionTree:
     def predict(self, X, bayes=False):
         """
         :param X: [[attr1, attr2...], [attr1, attr2...]...]
-        :return: The value y[i] has the prediction of X[i]
+        :return: The value y[i] is a list of the probabilities that X[i] belongs to a certain class
         """
         if not type(X[0]) == list:
             X = [X]
@@ -357,7 +357,7 @@ class DecisionTree:
         return round(self.f(self.y, self.classes), 4)
 
     def getPrediction(self):
-        return self.classNode
+        return max(self.classNode)
 
     def getAttrSplit(self):
         if self.attrSplit == None:

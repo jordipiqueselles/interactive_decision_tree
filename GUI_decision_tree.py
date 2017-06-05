@@ -10,6 +10,7 @@ from abc import ABC
 import functools
 import math
 import pickle
+from sklearn.metrics import roc_curve, roc_auc_score
 
 import matplotlib
 matplotlib.use('TkAgg')
@@ -136,7 +137,8 @@ class MyMenu:
         y = df3.values.flatten().tolist()
         nTrain = round(0.7 * len(y))
 
-        dcTree = decisionTree.DecisionTree(X[:nTrain], y[:nTrain], [True, False], f=decisionTree.gini, attrNames=list(df2.columns))
+        dcTree = decisionTree.DecisionTree(X[:nTrain], y[:nTrain], sorted(list(set(y)), reverse=True),
+                                           f=decisionTree.gini, attrNames=list(df2.columns))
         self.resetFrame()
         self.currentView = EditTreeGUI(self.mainFrame, dcTree, X[nTrain:], y[nTrain:])
 
@@ -370,8 +372,20 @@ class EditTreeGUI:
 
     def predict_cv(self, event):
         pred_y = self.treeFrame.predict_cv(self.X_cv, self.naiveBayes)
-        accuracy = sum([elem[0] == elem[1] for elem in zip(self.y_cv, pred_y)]) / len(self.y_cv)
-        tkMessageBox.showinfo('', lg.accuracy + str(round(accuracy, 4)))
+        tags = [self.dcTree.classes[max(enumerate(elem), key=lambda x: x[1])[0]] for elem in pred_y]
+        accuracy = sum([elem[0] == elem[1] for elem in zip(self.y_cv, tags)]) / len(self.y_cv)
+
+        fpr = dict()
+        tpr = dict()
+        prob = np.array([list(zip(*elem))[0] for elem in pred_y])
+        ok_y = np.array(self.y_cv)
+        plt.figure()
+        for i in range(len(self.dcTree.classes)):
+            fpr[i], tpr[i], _ = roc_curve(ok_y, prob[:, i], pos_label=self.dcTree.classes[i])
+            plt.plot(fpr[i], tpr[i])
+        # tkMessageBox.showinfo('', lg.accuracy + str(round(accuracy, 4)))
+        plt.title(lg.accuracy + str(round(accuracy, 4)))
+        plt.show()
 
     def optionMenuClicked(self, *args):
         self.changePlot()
