@@ -47,11 +47,11 @@ class Language:
         self.varSplit = 'Variable split'
         self.naiveBayes = 'Naive Bayes'
 
-        self.infoNumElems = 'Number of elements: '
-        self.infoAccuray = 'Accuracy: '
-        self.infoPrediction = 'Prediction: '
-        self.infoAttrSplit = 'Variable split: '
-        self.inforImpurity = 'Gini impurity: '
+        self.infoNumElems = 'Number of elements'
+        self.infoAccuray = 'Accuracy'
+        self.infoPrediction = 'Prediction'
+        self.infoAttrSplit = 'Variable split'
+        self.inforImpurity = 'Impurity'
         self.accuracy = 'Accuracy: '
 
         self.file = 'File'
@@ -64,7 +64,7 @@ class Language:
 
         self.predict = 'Predict'
         self.predictFile = 'Predict from file'
-        self.advOptions = 'Advanced options for '
+        self.advOptions = 'Advanced options'
         self.minSetSize = 'Min dataset size'
         self.minImpReduction = 'Min impurity reduction'
         self.fImp = 'Function impurity'
@@ -83,6 +83,7 @@ class Language:
 
         self.fpr = 'False Positive Rate'
         self.tpr = 'True Positive Rate'
+        self.predictionDone = 'Prediction done!'
 
     def setSpanish(self):
         pass
@@ -132,7 +133,8 @@ class MyMenu:
         Shows a dialog window to choose a file and it creates a view for building a decision tree from the data of the
         selected file
         """
-        file = fDialog.askopenfile(mode='r')
+        FILEOPENOPTIONS = dict(defaultextension='.csv', filetypes=[('cvs file','*.csv')])
+        file = fDialog.askopenfile(mode='r', **FILEOPENOPTIONS)
         df = pd.read_csv(file.name).sample(frac=1)
 
         df2 = df.iloc[:,:len(df.columns)-1]
@@ -147,7 +149,8 @@ class MyMenu:
         self.currentView = EditTreeGUI(self.mainFrame, dcTree, X[nTrain:], y[nTrain:])
 
     def newPrediction(self):
-        file = fDialog.askopenfile(mode='r')
+        FILEOPENOPTIONS = dict(defaultextension='.pkl', filetypes=[('pkl file','*.pkl')])
+        file = fDialog.askopenfile(mode='r', **FILEOPENOPTIONS)
         with open(file.name, 'rb') as input_:
             auxDcTree = pickle.load(input_)
             dcTree = decisionTree.DecisionTree.copyVarTree(auxDcTree)
@@ -156,12 +159,13 @@ class MyMenu:
 
     def saveTree(self):
         if type(self.currentView) == EditTreeGUI:
-            file = fDialog.asksaveasfile(mode='w')
+            file = fDialog.asksaveasfile(mode='w', defaultextension=".pkl")
             self.currentView.saveDcTree(file.name)
 
 
     def editTree(self):
-        file = fDialog.askopenfile(mode='r')
+        FILEOPENOPTIONS = dict(defaultextension='.pkl', filetypes=[('pkl file','*.pkl')])
+        file = fDialog.askopenfile(mode='r', **FILEOPENOPTIONS)
         with open(file.name, 'rb') as input_:
             auxDcTree = pickle.load(input_)
             X_cv = auxDcTree.X_cv
@@ -302,54 +306,54 @@ class EditTreeGUI:
 
         # Central Frame #
         centralFrame = Frame(self.master)
-        centralFrame.pack(side=LEFT)
+        centralFrame.pack(side=LEFT, padx=10, pady=10, anchor=S+W)
         # Tree
         self.treeFrame = TreeFrameEdit(centralFrame, self.dcTree, self)
 
         # Buttons Frame #
         buttonsFrame = Frame(centralFrame)
-        buttonsFrame.pack(side=TOP)
+        buttonsFrame.pack(side=TOP, padx=10, pady=10)
         # Buttons
         # Button validate
         b_validate = Button(buttonsFrame, text=lg.validate)
-        b_validate.grid(row=0, column=0)
+        b_validate.grid(row=0, column=0, sticky=N+S+E+W)
         b_validate.bind('<Button-1>', self.predict_cv)
         # Button advanced options
         b_adOptions = Button(buttonsFrame, text=lg.adOptions)
-        b_adOptions.grid(row=1, column=0)
+        b_adOptions.grid(row=1, column=0, sticky=N+S+E+W)
         b_adOptions.bind('<Button-1>', self.advancedOptions)
         # Button prune
         b_prune = Button(buttonsFrame, text=lg.prune)
-        b_prune.grid(row=0, column=1)
+        b_prune.grid(row=0, column=1, sticky=N+S+E+W)
         b_prune.bind('<Button-1>', self.prune)
         # Button join
         b_join = Button(buttonsFrame, text=lg.join)
-        b_join.grid(row=1, column=1)
+        b_join.grid(row=1, column=1, sticky=N+S+E+W)
         b_join.bind('<Button-1>', self.treeFrame.joinNodes)
         # Button autosplit
         b_autoSplit = Button(buttonsFrame, text=lg.autosplit)
-        b_autoSplit.grid(row=0, column=2)
+        b_autoSplit.grid(row=0, column=2, sticky=N+S+E+W)
         b_autoSplit.bind('<Button-1>', self.autoSplit)
         # Button best split
         b_bestSplit = Button(buttonsFrame, text=lg.bestSplit)
-        b_bestSplit.grid(row=1, column=2)
+        b_bestSplit.grid(row=1, column=2, sticky=N+S+E+W)
         b_bestSplit.bind('<Button-1>', self.bestSplit)
         # Option Menu
         self.tkvar = StringVar(root)
         self.tkvar.set(self.dcTree.attrNames[0]) # set the default option
         self.tkvar.trace('w', self.optionMenuClicked)
         self.popupMenu = OptionMenu(buttonsFrame, self.tkvar, *self.dcTree.attrNames)
-        self.popupMenu.grid(row=0, column=3)
+        self.popupMenu.grid(row=0, column=3, sticky=N+S+E+W)
         # Button best split
         b_split = Button(buttonsFrame, text=lg.split)
-        b_split.grid(row=1, column=3)
+        b_split.grid(row=1, column=3, sticky=N+S+E+W)
         b_split.bind('<Button-1>', self.split)
         # cb_NaiBay = Checkbutton(buttonsFrame, text=lg.naiveBayes)
         # cb_NaiBay.pack(side=BOTTOM)
 
         # Right Frame #
-        rightFrame = Frame(self.master)
-        rightFrame.pack(side=RIGHT, expand=True)
+        rightFrame = Frame(self.master, padx=10, pady=10)
+        rightFrame.pack(side=RIGHT, anchor=S+E)
         # prova grafic
         self.figure = Figure(figsize=(7, 6), dpi=100)
         # a tk.DrawingArea
@@ -458,7 +462,7 @@ class AdvancedOptionsGUI:
         self.root.title(lg.advOptions)
         
         topFrame = Frame(self.root)
-        topFrame.pack(side=TOP)
+        topFrame.pack(side=TOP, padx=10, pady=10)
         # MinSetSize
         Label(topFrame, text=lg.minSetSize).grid(row=0, column=0)
         self.eMinSetSize = Entry(topFrame)
@@ -497,9 +501,9 @@ class AdvancedOptionsGUI:
         self.varNB.set(self.frameParent.naiveBayes)
         
         middleFrame = Frame(self.root)
-        middleFrame.pack(side=TOP)
-        Label(middleFrame, text=lg.variable).grid(row=0, column=0)
-        Label(middleFrame, text=lg.howToSplit).grid(row=0, column=1)
+        middleFrame.pack(side=TOP, padx=10, pady=10)
+        Label(middleFrame, text=lg.variable, font="Verdana 10 bold").grid(row=0, column=0)
+        Label(middleFrame, text=lg.howToSplit, font="Verdana 10 bold").grid(row=0, column=1)
         self.lHowToSplit = []
         for (i, attrName) in enumerate(self.lAttr):
             Label(middleFrame, text=attrName).grid(row=i+1, column=0)
@@ -584,31 +588,37 @@ class PredictGUI:
         self.master = master
         # Left Frame #
         leftFrame = Frame(self.master)
-        leftFrame.pack(side=LEFT)
+        leftFrame.pack(side=LEFT, anchor=W, padx=20, pady=20)
         # Tree
         self.dcTree = dcTree
         self.treeFrame = TreeFramePredict(leftFrame, dcTree, self)
 
         # Right frame
         rightFrame = Frame(self.master, width=100)
-        rightFrame.pack(side=TOP)
+        rightFrame.pack(side=TOP, anchor=E, padx=20, pady=20)
         self.listEntries = []
         for (i, attr) in enumerate(self.dcTree.attrNames):
             Label(rightFrame, text=str(attr)).grid(row=i, column=0, sticky=N)
             entry = Entry(rightFrame, width=13)
             entry.grid(row=i, column=1, sticky=N)
             self.listEntries.append(entry)
-        Label(rightFrame, text=lg.infoPrediction).grid(row=len(self.dcTree.attrNames), column=0, sticky=N)
-        self.labelPred = Label(rightFrame, text='-')
+        Label(rightFrame, text=lg.infoPrediction, font="Verdana 10 bold").grid(row=len(self.dcTree.attrNames), column=0, sticky=N)
+        self.labelPred = Label(rightFrame, text='-', relief=RIDGE)
         self.labelPred.grid(row=len(self.dcTree.attrNames), column=1, sticky=N)
+
+        Label(rightFrame, text=lg.naiveBayes).grid(row=len(self.dcTree.attrNames)+1, column=0)
+        self.varNB = IntVar(rightFrame)
+        self.naiveBayes = Checkbutton(rightFrame, text=lg.yesNo, variable=self.varNB)
+        self.naiveBayes.grid(row=len(self.dcTree.attrNames)+1, column=1, padx=10, pady=20)
+        self.varNB.set(False)
 
         self.b_predict = Button(rightFrame, text=lg.predict)
         self.b_predict.bind('<Button-1>', self.predict)
-        self.b_predict.grid(row=len(self.dcTree.attrNames)+1)
+        self.b_predict.grid(row=len(self.dcTree.attrNames)+2, column=0, padx=10)
 
         self.b_predict_file = Button(rightFrame, text=lg.predictFile)
         self.b_predict_file.bind('<Button-1>', self.predictFile)
-        self.b_predict_file.grid(row=len(self.dcTree.attrNames)+2)
+        self.b_predict_file.grid(row=len(self.dcTree.attrNames)+2, column=1, padx=10)
 
     def predict(self, event):
         ll = []
@@ -616,23 +626,23 @@ class PredictGUI:
             str_attr = l_attr.get()
             try:
                 ll.append(float(str_attr))
-            except ValueError:
+            except:
                 ll.append(str_attr)
-        result = self.dcTree.predict(ll, False)
+        result = self.dcTree.predict(ll, self.varNB.get())
         print(result[0])
         self.labelPred['text'] = str(result[0])
 
     def predictFile(self, event):
-        file = fDialog.askopenfile(mode='r')
+        FILEOPENOPTIONS = dict(defaultextension='.csv', filetypes=[('cvs file','*.csv')])
+        file = fDialog.askopenfile(mode='r', **FILEOPENOPTIONS)
         df = pd.read_csv(file.name).sample(frac=1)
         X = df.values.tolist()
         y_pred = self.dcTree.predict(X, False)
-        # df = pd.DataFrame()
         prob = np.array([list(zip(*elem))[0] for elem in y_pred])
         for (i, cls) in enumerate(self.dcTree.classes):
             df[str(cls)] = prob[:, i]
         df.to_csv(path_or_buf=file.name + '_prediction.csv')
-        tkMessageBox.showinfo('Ueeeeee!!!', 'Ueeeeee!')
+        tkMessageBox.showinfo('', lg.predictionDone)
 
 
 # Important variables #'

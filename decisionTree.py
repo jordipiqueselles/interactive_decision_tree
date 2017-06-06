@@ -133,29 +133,33 @@ class DecisionTree:
         else:
             self.attrNames = attrNames
 
-        # Naive Bayes classifier
+        # Naive Bayes classifier (gaussian)
         self.gaussNB = GaussianNB()
         Xnum = [[atr for atr in elem if type(atr) == float or type(atr) == int] for elem in X]
         self.gaussNB.fit(Xnum, y)
 
+        # Naive Bayes classifier (multinomial)
         Xcat = [[atr for atr in elem if type(atr) != float and type(atr) != int] for elem in X]
-        typesCat = [set() for i in range(len(Xcat[0]))]
+        self.typesCat = [set() for _ in range(len(Xcat[0]))]
         for row in Xcat:
             for i in range(len(row)):
-                typesCat[i].add(row[i])
-        typesCat = [list(s) for s in typesCat]
+                self.typesCat[i].add(row[i])
+        self.typesCat = [list(s) for s in self.typesCat]
 
         Xmult = list()
         for row in Xcat:
-            ll = []
-            for i in range(len(row)):
-                auxLL = [0] * len(typesCat[i])
-                auxLL[typesCat[i].index(row[i])] = 1
-                ll += auxLL
+            ll = self.__transformToBinary(row)
             Xmult.append(ll)
-        # TODO join the two naive bayes predictors
         self.multNB = MultinomialNB()
         self.multNB.fit(Xmult, y)
+
+    def __transformToBinary(self, row):
+        ll = []
+        for i in range(len(row)):
+            auxLL = [0] * len(self.typesCat[i])
+            auxLL[self.typesCat[i].index(row[i])] = 1
+            ll += auxLL
+        return ll
 
     @staticmethod
     def copyVarTree(dcTree):
@@ -320,6 +324,14 @@ class DecisionTree:
             raise Exception('First value of', ll, 'out of range')
         return self.sons[ll[0]].getNode(ll[1:])
 
+    def __bayesPredict(self, node, elem):
+        numVar = list(filter(lambda x: type(x) == int or type(x) == float, elem))
+        catVar = list(filter(lambda x: type(x) != int and type(x) != float, elem))
+        catVarBinary = node.__transformToBinary(catVar)
+        prGauss = node.gaussNB.predict_proba([numVar]).flatten()
+        prMult = node.multNB.predict_proba([catVarBinary]).flatten()
+        return [(prGauss[i] * prMult[i] / prCls, cls) for (i, (prCls, cls)) in enumerate(sorted(node.classNode, key=lambda x: x[1]))]
+
     def _auxPredict(self, elem, bayes):
         currentNode = self
         t = True
@@ -331,8 +343,7 @@ class DecisionTree:
                     t = True
                     break
         if bayes:
-            # TODO combine both Naive Bayes predictors and divide the variables between numerical and categorical
-            return currentNode.gaussNB.predict(elem)
+            return self.__bayesPredict(currentNode, elem)
         else:
             return currentNode.classNode
 
@@ -345,7 +356,7 @@ class DecisionTree:
             X = [X]
         pool = multiprocessing.Pool(multiprocessing.cpu_count())
         # return [self._auxPredict(elem) for elem in X]
-        return pool.map(functools.partial(self._auxPredict, bayes=bayes), X)
+        return list(map(functools.partial(self._auxPredict, bayes=bayes), X))
 
     def getNumElems(self):
         return len(self.y)
