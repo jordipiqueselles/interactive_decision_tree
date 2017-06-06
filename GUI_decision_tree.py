@@ -10,7 +10,7 @@ from abc import ABC
 import functools
 import math
 import pickle
-from sklearn.metrics import roc_curve, roc_auc_score
+from sklearn.metrics import roc_curve, roc_auc_score, auc
 
 import matplotlib
 matplotlib.use('TkAgg')
@@ -63,6 +63,7 @@ class Language:
         self.about = 'About'
 
         self.predict = 'Predict'
+        self.predictFile = 'Predict from file'
         self.advOptions = 'Advanced options for '
         self.minSetSize = 'Min dataset size'
         self.minImpReduction = 'Min impurity reduction'
@@ -79,6 +80,9 @@ class Language:
         self.silhouette = 'Silhouette'
         self.varRed = 'Variance reduction'
         self.error = 'Error'
+
+        self.fpr = 'False Positive Rate'
+        self.tpr = 'True Positive Rate'
 
     def setSpanish(self):
         pass
@@ -382,9 +386,13 @@ class EditTreeGUI:
         plt.figure()
         for i in range(len(self.dcTree.classes)):
             fpr[i], tpr[i], _ = roc_curve(ok_y, prob[:, i], pos_label=self.dcTree.classes[i])
-            plt.plot(fpr[i], tpr[i])
+            area = round(auc(fpr[i], tpr[i]), 2)
+            plt.plot(fpr[i], tpr[i], label=str(self.dcTree.classes[i]) + ' (area: ' + str(area) + ')')
         # tkMessageBox.showinfo('', lg.accuracy + str(round(accuracy, 4)))
         plt.title(lg.accuracy + str(round(accuracy, 4)))
+        plt.xlabel(lg.fpr)
+        plt.ylabel(lg.tpr)
+        plt.legend(loc="lower right")
         plt.show()
 
     def optionMenuClicked(self, *args):
@@ -586,17 +594,21 @@ class PredictGUI:
         rightFrame.pack(side=TOP)
         self.listEntries = []
         for (i, attr) in enumerate(self.dcTree.attrNames):
-            Label(rightFrame, text=str(attr)).grid(row=0, column=i, sticky=N)
-            entry = Entry(rightFrame, width=15)
-            entry.grid(row=1, column=i, sticky=N)
+            Label(rightFrame, text=str(attr)).grid(row=i, column=0, sticky=N)
+            entry = Entry(rightFrame, width=13)
+            entry.grid(row=i, column=1, sticky=N)
             self.listEntries.append(entry)
-        Label(rightFrame, text=lg.infoPrediction).grid(row=0, column=len(self.dcTree.attrNames), sticky=N)
+        Label(rightFrame, text=lg.infoPrediction).grid(row=len(self.dcTree.attrNames), column=0, sticky=N)
         self.labelPred = Label(rightFrame, text='-')
-        self.labelPred.grid(row=1, column=len(self.dcTree.attrNames), sticky=N)
+        self.labelPred.grid(row=len(self.dcTree.attrNames), column=1, sticky=N)
 
         self.b_predict = Button(rightFrame, text=lg.predict)
         self.b_predict.bind('<Button-1>', self.predict)
-        self.b_predict.grid(row=2)
+        self.b_predict.grid(row=len(self.dcTree.attrNames)+1)
+
+        self.b_predict_file = Button(rightFrame, text=lg.predictFile)
+        self.b_predict_file.bind('<Button-1>', self.predictFile)
+        self.b_predict_file.grid(row=len(self.dcTree.attrNames)+2)
 
     def predict(self, event):
         ll = []
@@ -610,7 +622,20 @@ class PredictGUI:
         print(result[0])
         self.labelPred['text'] = str(result[0])
 
-# Important variables #
+    def predictFile(self, event):
+        file = fDialog.askopenfile(mode='r')
+        df = pd.read_csv(file.name).sample(frac=1)
+        X = df.values.tolist()
+        y_pred = self.dcTree.predict(X, False)
+        # df = pd.DataFrame()
+        prob = np.array([list(zip(*elem))[0] for elem in y_pred])
+        for (i, cls) in enumerate(self.dcTree.classes):
+            df[str(cls)] = prob[:, i]
+        df.to_csv(path_or_buf=file.name + '_prediction.csv')
+        tkMessageBox.showinfo('Ueeeeee!!!', 'Ueeeeee!')
+
+
+# Important variables #'
 
 lg = Language()
 root = Tk()
