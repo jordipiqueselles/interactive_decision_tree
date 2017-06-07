@@ -90,6 +90,7 @@ class Language:
 
         self.fpr = 'False Positive Rate'
         self.tpr = 'True Positive Rate'
+        self.rocCurve = 'ROC curve'
         self.predictionDone = 'Prediction done!'
 
     def setSpanish(self):
@@ -280,6 +281,10 @@ class TreeFrameEdit(TreeFrame):
     Class that extends the TreeFrame abstract class
     """
     def getSegData(self, selectedAttr):
+        """
+        :param selectedAttr: Name of an attribute
+        :return: The data of the selected node segmented using selectedAttr
+        """
         node = self.mapNode[self.gui_tree.focus()]
         segData = node.getSegmentedData(self.dcTree.attrNames.index(selectedAttr))
         return segData
@@ -288,16 +293,18 @@ class TreeFrameEdit(TreeFrame):
         dcTree = self.mapNode[self.gui_tree.focus()]
 
     def autoSplit(self, minSetSize, giniReduction):
+        """
+        Splits automatically and recursivelly the selected node
+        """
         self.prune()
-        print('Autospliting')
         dcTree = self.mapNode[self.gui_tree.focus()]
         dcTree.autoSplit(minSetSize=minSetSize, giniReduction=giniReduction)
-        print('Autosplit completed')
         self.addNodes(self.gui_tree.focus(), dcTree)
-        pass
 
-    def joinNodes(self, event):
-        print('joinning')
+    def joinNodes(self):
+        """
+        Joins the selected nodes into one
+        """
         setNodes = self.gui_tree.selection()
         if len(setNodes) >= 2:
             parent = self.gui_tree.parent(setNodes[0])
@@ -313,7 +320,9 @@ class TreeFrameEdit(TreeFrame):
                 self.mapNode[idJoinedNode] = joinedNode
 
     def prune(self):
-        print('prunning')
+        """
+        Eliminates all the sons of the selected node
+        """
         nodeGUI = self.gui_tree.focus()
         dcTree = self.mapNode[nodeGUI]
         self.gui_tree.set(nodeGUI, TreeFrame.keyAttrSplit, str(dcTree.getAttrSplit()))
@@ -323,6 +332,10 @@ class TreeFrameEdit(TreeFrame):
             self.gui_tree.delete(node)
 
     def split(self, idxAttr):
+        """
+        :param idxAttr: Index of the attribute used to split the node
+        Splits the selected node according to the attribute specified in idxAttr
+        """
         self.prune()
         nodeGUI = self.gui_tree.focus()
         dcTree = self.mapNode[nodeGUI]
@@ -330,11 +343,17 @@ class TreeFrameEdit(TreeFrame):
         self.addNodes(nodeGUI, dcTree)
 
     def bestSplit(self):
+        """
+        :return: A sorted list in increasing order of the possible splits
+        """
         nodeGUI = self.gui_tree.focus()
         dcTree = self.mapNode[nodeGUI]
         return dcTree.bestSplit()
 
     def nodeClicked(self, event):
+        """
+        Shows the plot corresponding to the selected node
+        """
         self.parent.changePlot()
 
 
@@ -344,9 +363,10 @@ class TreeFramePredict(TreeFrame):
 class EditTreeGUI:
     def __init__(self, master, dcTree, X_cv, y_cv):
         """
-        :param master:
-        :param dcTree:
-        :return:
+        :param master: Root frame where this view will be displayed
+        :param dcTree: A DecisionTree
+        :param X_cv: X test data
+        :param y_cv: y test data
         """
         self.master = master
         self.dcTree = dcTree
@@ -356,14 +376,14 @@ class EditTreeGUI:
         self.minImpRed = 0.01
         self.naiveBayes = False
 
-        # Central Frame #
-        centralFrame = Frame(self.master)
-        centralFrame.pack(side=LEFT, padx=10, pady=10, anchor=S+W)
+        # Left Frame #
+        leftFrame = Frame(self.master)
+        leftFrame.pack(side=LEFT, padx=10, pady=10, anchor=S+W)
         # Tree
-        self.treeFrame = TreeFrameEdit(centralFrame, self.dcTree, self)
+        self.treeFrame = TreeFrameEdit(leftFrame, self.dcTree, self)
 
         # Buttons Frame #
-        buttonsFrame = Frame(centralFrame)
+        buttonsFrame = Frame(leftFrame)
         buttonsFrame.pack(side=TOP, padx=10, pady=10)
         # Buttons
         # Button validate
@@ -381,7 +401,7 @@ class EditTreeGUI:
         # Button join
         b_join = Button(buttonsFrame, text=lg.join)
         b_join.grid(row=1, column=1, sticky=N+S+E+W)
-        b_join.bind('<Button-1>', self.treeFrame.joinNodes)
+        b_join.bind('<Button-1>', self.joinNodes)
         # Button autosplit
         b_autoSplit = Button(buttonsFrame, text=lg.autosplit)
         b_autoSplit.grid(row=0, column=2, sticky=N+S+E+W)
@@ -400,51 +420,68 @@ class EditTreeGUI:
         b_split = Button(buttonsFrame, text=lg.split)
         b_split.grid(row=1, column=3, sticky=N+S+E+W)
         b_split.bind('<Button-1>', self.split)
-        # cb_NaiBay = Checkbutton(buttonsFrame, text=lg.naiveBayes)
-        # cb_NaiBay.pack(side=BOTTOM)
 
         # Right Frame #
         rightFrame = Frame(self.master, padx=10, pady=10)
         rightFrame.pack(side=RIGHT, anchor=S+E)
-        # prova grafic
+        # The plot
         self.figure = Figure(figsize=(7, 6), dpi=100)
-        # a tk.DrawingArea
         self.canvas = FigureCanvasTkAgg(self.figure, master=rightFrame)
         self.canvas.show()
         self.canvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=1)
         self.changePlot()
 
+    def joinNodes(self, event):
+        """
+        Calls the TreeFrame.joinNodes() method
+        """
+        self.treeFrame.joinNodes()
+
     def prune(self, event):
+        """
+        Calls the TreeFrame.prune() method
+        """
         self.treeFrame.prune()
 
     def autoSplit(self, event):
+        """
+        Calls the TreeFrame.autoSplit() method
+        """
         self.treeFrame.autoSplit(self.minSetSize, self.minImpRed)
 
     def split(self, event):
+        """
+        Calls the TreeFrame.split() method
+        """
         selectedAttr = self.tkvar.get()
         idxAttr = self.dcTree.attrNames.index(selectedAttr)
         self.treeFrame.split(idxAttr)
 
     def bestSplit(self, event):
+        """
+        Calls the TreeFrame.bestSlpit() method and show the information computed
+        """
         listSplits = self.treeFrame.bestSplit()
         listSplits = [(gImp, self.dcTree.attrNames[i]) for (gImp, i) in listSplits]
         InfoBestSplits(listSplits)
 
     def predict_cv(self, event):
+        """
+        Calculates the accuracy of the DecisionTree using the test data and plots the ROC curve
+        """
         pred_y = self.treeFrame.predict_cv(self.X_cv, self.naiveBayes)
         tags = [self.dcTree.classes[max(enumerate(elem), key=lambda x: x[1])[0]] for elem in pred_y]
         accuracy = sum([elem[0] == elem[1] for elem in zip(self.y_cv, tags)]) / len(self.y_cv)
 
-        fpr = dict()
-        tpr = dict()
+        fpr = dict() # false positives
+        tpr = dict() # true positives
         prob = np.array([list(zip(*elem))[0] for elem in pred_y])
-        ok_y = np.array(self.y_cv)
-        plt.figure()
+        y_cv = np.array(self.y_cv)
+        plt.figure().canvas.set_window_title(lg.rocCurve)
         for i in range(len(self.dcTree.classes)):
-            fpr[i], tpr[i], _ = roc_curve(ok_y, prob[:, i], pos_label=self.dcTree.classes[i])
+            fpr[i], tpr[i], _ = roc_curve(y_cv, prob[:, i], pos_label=self.dcTree.classes[i])
             area = round(auc(fpr[i], tpr[i]), 2)
             plt.plot(fpr[i], tpr[i], label=str(self.dcTree.classes[i]) + ' (area: ' + str(area) + ')')
-        # tkMessageBox.showinfo('', lg.accuracy + str(round(accuracy, 4)))
         plt.title(lg.accuracy + str(round(accuracy, 4)))
         plt.xlabel(lg.fpr)
         plt.ylabel(lg.tpr)
@@ -455,6 +492,9 @@ class EditTreeGUI:
         self.changePlot()
 
     def changePlot(self):
+        """
+        Change the plot according to the selected node and the selected attribute
+        """
         selectedAttr = self.tkvar.get()
         segData = self.treeFrame.getSegData(selectedAttr)
         self.figure.clear()
@@ -490,6 +530,10 @@ class EditTreeGUI:
         self.canvas.show()
 
     def saveDcTree(self, file):
+        """
+        :param file: File where the DecisionTree will be saved
+        Saves the DecisionTree in the specified file
+        """
         self.dcTree.X_cv = self.X_cv
         self.dcTree.y_cv = self.y_cv
         with open(file, 'wb') as output:
@@ -497,9 +541,15 @@ class EditTreeGUI:
             pickler.dump(self.dcTree)
             
     def advancedOptions(self, event):
+        """
+        Opens the advanced options window
+        """
         AdvancedOptionsGUI(self, self.dcTree)
 
     def receiveChanges(self, minSetSize, minImpRed, naiveBayes):
+        """
+        Updates some parameters and the TreeView when there have been changes in the advanced options window
+        """
         self.minSetSize = minSetSize
         self.minImpRed = minImpRed
         self.naiveBayes = naiveBayes
@@ -507,12 +557,17 @@ class EditTreeGUI:
 
 class AdvancedOptionsGUI:
     def __init__(self, frameParent, dcTree):
+        """
+        :param frameParent: Frame that has called this constructor
+        :param dcTree: A DecisionTree
+        """
         self.frameParent = frameParent
         self.dcTree = dcTree
         self.lAttr = dcTree.attrNames
         self.root = Tk()
         self.root.title(lg.advOptions)
-        
+
+        # Top Frame
         topFrame = Frame(self.root)
         topFrame.pack(side=TOP, padx=10, pady=10)
         # MinSetSize
@@ -532,7 +587,7 @@ class AdvancedOptionsGUI:
             self.tkvarFImp.set(lg.gini) # set the default option
         elif self.dcTree.f == decisionTree.entropy:
             self.tkvarFImp.set(lg.entropy) # set the default option
-        self.tkvarFImp.trace('w', self.fImpSelected)
+        # self.tkvarFImp.trace('w', self.fImpSelected)
         self.menuFImp = OptionMenu(topFrame, self.tkvarFImp, *[lg.gini, lg.entropy])
         self.menuFImp.grid(row=2, column=1)
         # f_Kmeans
@@ -542,7 +597,7 @@ class AdvancedOptionsGUI:
             self.tkvarFKmeans.set(lg.silhouette) # set the default option
         elif self.dcTree.perfKmeans == decisionTree.perfKmeanVar:
             self.tkvarFKmeans.set(lg.varRed) # set the default option
-        self.tkvarFKmeans.trace('w', self.fImpSelected)
+        # self.tkvarFKmeans.trace('w', self.fImpSelected)
         self.menuFKmeans = OptionMenu(topFrame, self.tkvarFKmeans, *[lg.silhouette, lg.varRed])
         self.menuFKmeans.grid(row=3, column=1)
         # Naive Bayes
@@ -551,20 +606,24 @@ class AdvancedOptionsGUI:
         self.naiveBayes = Checkbutton(topFrame, text=lg.yesNo, variable=self.varNB, command=self.cb)
         self.naiveBayes.grid(row=4, column=1)
         self.varNB.set(self.frameParent.naiveBayes)
-        
+
+        # Middle Frame
         middleFrame = Frame(self.root)
         middleFrame.pack(side=TOP, padx=10, pady=10)
+        # Titles
         Label(middleFrame, text=lg.variable, font="Verdana 10 bold").grid(row=0, column=0)
         Label(middleFrame, text=lg.howToSplit, font="Verdana 10 bold").grid(row=0, column=1)
         self.lHowToSplit = []
         for (i, attrName) in enumerate(self.lAttr):
+            # How to split labels and entries
             Label(middleFrame, text=attrName).grid(row=i+1, column=0)
             entryHowToSplit = Entry(middleFrame)
             entryHowToSplit.grid(row=i+1, column=1)
             if i in self.dcTree.staticSplits:
                 entryHowToSplit.insert(END, str(self.dcTree.staticSplits[i]))
             self.lHowToSplit.append(entryHowToSplit)
-        
+
+        # Bottom Frame
         bottomFrame = Frame(self.root)
         bottomFrame.pack(side=BOTTOM)
         self.b_accept = Button(bottomFrame, text=lg.accept)
@@ -576,13 +635,17 @@ class AdvancedOptionsGUI:
 
         self.root.mainloop()
         
-    def fImpSelected(self, *args):
-        pass
+    # def fImpSelected(self, *args):
+    #     pass
 
     def cb(self):
+        # TODO Only for testing uses
         print(self.varNB.get())
 
     def accept(self, event):
+        """
+        Passes the changes to the parent frame and closes the window
+        """
         # parse minSetSize
         try:
             minSetSize = int(self.eMinSetSize.get())
@@ -619,13 +682,23 @@ class AdvancedOptionsGUI:
         self.root.destroy()
 
     def cancel(self, event):
+        """
+        Closes the window without saving any changes
+        """
         self.root.destroy()
 
     def throwError(self):
+        """
+        Show a message box error to the user
+        """
         tkMessageBox.showerror(lg.error, lg.error)
 
 class InfoBestSplits:
     def __init__(self, listSplits):
+        """
+        :param listSplits: [(impurity1, attribute1), (impurity2, attribute2), ...]
+        Creates a window that shows the impurity for each attribute given with the parameter listSplits
+        """
         self.root = Tk()
         self.root.title(lg.bestSplit)
         for (i, (gImp, attr)) in enumerate(listSplits):
@@ -637,6 +710,11 @@ class InfoBestSplits:
 
 class PredictGUI:
     def __init__(self, master, dcTree):
+        """
+        :param master: Root frame where this view will be displayed
+        :param dcTree: A DecisionTree
+        Creates a view to show a DecisionTree and make predictions
+        """
         self.master = master
         # Left Frame #
         leftFrame = Frame(self.master)
@@ -648,6 +726,7 @@ class PredictGUI:
         # Right frame
         rightFrame = Frame(self.master, width=100)
         rightFrame.pack(side=TOP, anchor=E, padx=20, pady=20)
+        # All the entries
         self.listEntries = []
         for (i, attr) in enumerate(self.dcTree.attrNames):
             Label(rightFrame, text=str(attr)).grid(row=i, column=0, sticky=N)
@@ -658,21 +737,25 @@ class PredictGUI:
         self.labelPred = Label(rightFrame, text='-', relief=RIDGE)
         self.labelPred.grid(row=len(self.dcTree.attrNames), column=1, sticky=N)
 
+        # The naive bayes checkbox
         Label(rightFrame, text=lg.naiveBayes).grid(row=len(self.dcTree.attrNames)+1, column=0)
         self.varNB = IntVar(rightFrame)
         self.naiveBayes = Checkbutton(rightFrame, text=lg.yesNo, variable=self.varNB)
         self.naiveBayes.grid(row=len(self.dcTree.attrNames)+1, column=1, padx=10, pady=20)
         self.varNB.set(False)
-
+        # The single prediction button
         self.b_predict = Button(rightFrame, text=lg.predict)
         self.b_predict.bind('<Button-1>', self.predict)
         self.b_predict.grid(row=len(self.dcTree.attrNames)+2, column=0, padx=10)
-
+        # The file prediction button
         self.b_predict_file = Button(rightFrame, text=lg.predictFile)
         self.b_predict_file.bind('<Button-1>', self.predictFile)
         self.b_predict_file.grid(row=len(self.dcTree.attrNames)+2, column=1, padx=10)
 
     def predict(self, event):
+        """
+        Shows the prediction of the element specified in the entries
+        """
         ll = []
         for l_attr in self.listEntries:
             str_attr = l_attr.get()
@@ -681,10 +764,14 @@ class PredictGUI:
             except:
                 ll.append(str_attr)
         result = self.dcTree.predict(ll, self.varNB.get())
-        print(result[0])
+        # print(result[0])
         self.labelPred['text'] = str(result[0])
 
     def predictFile(self, event):
+        """
+        Shows a dialog to open a csv file and make a prediction. The result will be stored in a file called
+        like the original file but with the '_prediction.csv' string appended
+        """
         FILEOPENOPTIONS = dict(defaultextension='.csv', filetypes=[('cvs file','*.csv')])
         file = fDialog.askopenfile(mode='r', **FILEOPENOPTIONS)
         df = pd.read_csv(file.name).sample(frac=1)
@@ -697,16 +784,11 @@ class PredictGUI:
         tkMessageBox.showinfo('', lg.predictionDone)
 
 
-# Important variables #'
-
 lg = Language()
 root = Tk()
 w, h = root.winfo_screenwidth(), root.winfo_screenheight()
 root.geometry("%dx%d+0+0" % (w, h))
 menu = MyMenu(root)
-
-# editTree = EditTree(root)
-
 root.mainloop()
 
 

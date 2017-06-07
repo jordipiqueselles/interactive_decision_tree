@@ -328,7 +328,7 @@ class DecisionTree:
 
     def bestSplit(self):
         """
-        :return: Calculate the split that has the lower gini impurity
+        :return: A sorted list in increasing order of the possible splits
         """
         pool = multiprocessing.Pool(multiprocessing.cpu_count())
         ll = pool.map(self._auxBestSplit, range(len(self.X[0]))) # pool.map(self._auxBestSplit, range(len(self.X[0])))
@@ -413,12 +413,13 @@ class DecisionTree:
     def predict(self, X, bayes=False):
         """
         :param X: [[attr1, attr2...], [attr1, attr2...]...]
-        :return: The value y[i] is a list of the probabilities that X[i] belongs to a certain class
+        :return: y[i] -> [(prob1, class1), (prob2, class2), ...]
         """
         if not type(X[0]) == list:
             X = [X]
         pool = multiprocessing.Pool(multiprocessing.cpu_count())
         # return [self._auxPredict(elem) for elem in X]
+        # TODO change again to pool.map(...)
         return list(map(functools.partial(self._auxPredict, bayes=bayes), X))
 
     def getNumElems(self):
