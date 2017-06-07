@@ -13,10 +13,20 @@ import pickle
 # Functions to evaluate the performance of a split #
 
 def gini(y, classes):
+    """
+    :param y: A list with the real classes of the data
+    :param classes: A list containing all the different classes that appear in y
+    :return: The gini impurity of y
+    """
     ll = (y.count(c) / len(y) for c in classes)
     return sum(pr*(1-pr) for pr in ll)
 
 def entropy(y, classes):
+    """
+    :param y: A list with the real classes of the data
+    :param classes: A list containing all the different classes that appear in y
+    :return: The entropy of y
+    """
     ll = (y.count(c) / len(y) for c in classes)
     return sum(-pr*math.log2(pr+1E-60) for pr in ll)
 
@@ -38,27 +48,61 @@ def fScore(pred, real):
 # in some parts and it cannot acces to a local function as a lambda can be #
 
 def decideCatAttr(x, atr):
+    """
+    :return: True if x and atr have the same value
+    """
     return x == atr
 
 def decideNumAtrr(x, cl0, cl1, cl2):
+    """
+    :param x: A number
+    :param cl0: The center of a cluster
+    :param cl1: The center of a cluster
+    :param cl2: The center of a cluster
+    :return: True if x is closer to cl1 than cl0 or cl2
+    """
     return (cl0 + cl1) / 2 <= x and x < (cl1 + cl2) / 2
 
 def joinConditions(x, cond1, cond2):
+    """
+    :param x: Any value
+    :param cond1: A boolean function
+    :param cond2: A boolean function
+    :return: A function that returns true if cond1 or cond2 are true for the parameter x
+    """
     return cond1(x) or cond2(x)
 
 def alwaysTrue(x):
+    """
+    :return: True, always
+    """
     return True
 
 def alwaysFalse(x):
+    """
+    :return: False, always
+    """
     return False
 
 # Functions that evaluate the performance of a kmeans clustering #
 
-def perfKmeanVar(x, predict, kmeans, i):
-    var = sum((x[i] - kmeans.cluster_centers_[predict[i]])**2 for i in range(len(x))) / len(x)
-    return (var + 1) * 1.3**i # 1.3
+def perfKmeanVar(x, predict, kmeans, nClusters):
+    """
+    :param x: List of numbers
+    :param predict: A list of the cluster centers assigned to the numbers in x
+    :param kmeans: A Kmeans object
+    :param nClusters: Number of clusters
+    :return: An indicator of how well the data is splited based on the variance and the number of clusters
+    """
+    var = sum((x[j] - kmeans.cluster_centers_[predict[j]])**2 for j in range(len(x))) / len(x)
+    return (var + 1) * 1.3 ** nClusters # 1.3
 
 def perfKmeansSilhouette(x, predict, kmeans=None, i=None):
+    """
+    :param x: List of numbers
+    :param predict: A list of the cluster centers assigned to the numbers in x
+    :return: The silhouette score
+    """
     # the sample size should be not too large
     return -silhouette_score(x, predict, sample_size=1000) # valor petit -> millor
 
@@ -163,6 +207,12 @@ class DecisionTree:
 
     @staticmethod
     def copyVarTree(dcTree):
+        """
+        :param dcTree: A DecisionTree object
+        :return: A new DecisionTree with the same values as dcTree
+        This function is used when a DecisionTree is loaded from a file. The class may have been modified since the
+        DecisionTree was stored. This helps to update the methods to the old DecisionTree
+        """
         newDcTree = DecisionTree(X=dcTree.X, y=dcTree.y, classes=dcTree.classes, attrNames=dcTree.attrNames, level=dcTree.level, f=dcTree.f,
                                  condition=dcTree.condition, perfKmeans=dcTree.perfKmeans, staticSplits=dcTree.staticSplits)
         newDcTree.attrSplit = dcTree.attrSplit
@@ -311,6 +361,9 @@ class DecisionTree:
         return joinedNode
 
     def getSons(self):
+        """
+        :return: All the sons from the current node
+        """
         return self.sons
 
     def getNode(self, ll):
@@ -325,6 +378,11 @@ class DecisionTree:
         return self.sons[ll[0]].getNode(ll[1:])
 
     def __bayesPredict(self, node, elem):
+        """
+        :param node: A DecisionTree
+        :param elem: An element to predict
+        :return: The prediction of elem based on the Naive Bayes classifier in node
+        """
         numVar = list(filter(lambda x: type(x) == int or type(x) == float, elem))
         catVar = list(filter(lambda x: type(x) != int and type(x) != float, elem))
         catVarBinary = node.__transformToBinary(catVar)
@@ -333,6 +391,11 @@ class DecisionTree:
         return [(prGauss[i] * prMult[i] / prCls, cls) for (i, (prCls, cls)) in enumerate(sorted(node.classNode, key=lambda x: x[1]))]
 
     def _auxPredict(self, elem, bayes):
+        """
+        :param elem: An element to predict
+        :param bayes: If True it uses the Naive Bayes predictor
+        :return: The prediction of elem
+        """
         currentNode = self
         t = True
         while t:
@@ -359,30 +422,52 @@ class DecisionTree:
         return list(map(functools.partial(self._auxPredict, bayes=bayes), X))
 
     def getNumElems(self):
+        """
+        :return: The number of elements that has the current node
+        """
         return len(self.y)
 
     def getAccuracy(self):
+        """
+        :return: The most common class divided by the total number of elements
+        """
         return round(max([self.y.count(cl) for cl in self.classes]) / len(self.y), 4)
 
     def getImpurity(self):
+        """
+        :return: The impurity of the current node
+        """
         return round(self.f(self.y, self.classes), 4)
 
     def getPrediction(self):
+        """
+        :return: [(score1, class1), (score2, class2)...] sorted by score in decreasing order
+        """
         return max(self.classNode)
 
     def getAttrSplit(self):
+        """
+        :return: The attribute used to split the data
+        """
         if self.attrSplit == None:
             return None
         else:
             return self.attrNames[self.attrSplit]
 
     def getSegmentedData(self, attrId):
+        """
+        :param attrId: Index of an attribute
+        :return: The data of the node segmented according to the attribute specified in attrId
+        """
         M = [[] for _ in self.classes]
         for (i, elem) in enumerate(self.X):
             M[self.classes.index(self.y[i])].append(elem[attrId])
         return M
 
     def propagateChanges(self):
+        """
+        Propagate some parameters of the current node to all its sons recursively
+        """
         for son in self.sons:
             son.f = self.f
             son.perfKmeans = self.perfKmeans

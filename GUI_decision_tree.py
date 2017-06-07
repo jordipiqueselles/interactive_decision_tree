@@ -29,6 +29,10 @@ class Language:
     spanish = 'spanish'
     catalan = 'catalan'
     def __init__(self, language=english):
+        """
+        :param language: The language the user wants to select
+        Initialize all the strings in this class in the specified language
+        """
         if language == Language.english:
             self.setEnglish()
         elif language == Language.spanish:
@@ -37,6 +41,9 @@ class Language:
             self.setCatalan()
 
     def setEnglish(self):
+        """
+        Initialize all the string to English
+        """
         self.autosplit = 'Autosplit'
         self.prune = 'Prune'
         self.join = 'Join'
@@ -86,16 +93,22 @@ class Language:
         self.predictionDone = 'Prediction done!'
 
     def setSpanish(self):
+        """
+        Initialize all the string to Spanish
+        """
         pass
 
     def setCatalan(self):
+        """
+        Initialize all the string to Catalan
+        """
         pass
         
 class MyMenu:
     def __init__(self, master):
         """
         :param master: The root Tk window where the menu will be inserted
-        Fills the master frame with a menu. This menu can give access to the main functionalities of the application
+        Fills the master frame with a menu. This menu can give access to the main functionalities of the application,
         as creating a decision tree or using one to predict
         """
         self.master = master
@@ -130,7 +143,7 @@ class MyMenu:
 
     def newTree(self):
         """
-        Shows a dialog window to choose a file and it creates a view for building a decision tree from the data of the
+        Shows a dialog window to choose a csv file and it creates a view for building a decision tree from the data of the
         selected file
         """
         FILEOPENOPTIONS = dict(defaultextension='.csv', filetypes=[('cvs file','*.csv')])
@@ -149,6 +162,10 @@ class MyMenu:
         self.currentView = EditTreeGUI(self.mainFrame, dcTree, X[nTrain:], y[nTrain:])
 
     def newPrediction(self):
+        """
+        Shows a dialog window to choose a pkl file (an existing DecisionTree) and creates a view to make predictions
+        based on the loaded DecisionTree
+        """
         FILEOPENOPTIONS = dict(defaultextension='.pkl', filetypes=[('pkl file','*.pkl')])
         file = fDialog.askopenfile(mode='r', **FILEOPENOPTIONS)
         with open(file.name, 'rb') as input_:
@@ -158,12 +175,18 @@ class MyMenu:
         self.currentView = PredictGUI(self.mainFrame, dcTree)
 
     def saveTree(self):
+        """
+        Opens a dialog window to save the current DecisionTree
+        """
         if type(self.currentView) == EditTreeGUI:
             file = fDialog.asksaveasfile(mode='w', defaultextension=".pkl")
             self.currentView.saveDcTree(file.name)
 
 
     def editTree(self):
+        """
+        Opens a dialog window to open an existing DesicionTree and continue editing it
+        """
         FILEOPENOPTIONS = dict(defaultextension='.pkl', filetypes=[('pkl file','*.pkl')])
         file = fDialog.askopenfile(mode='r', **FILEOPENOPTIONS)
         with open(file.name, 'rb') as input_:
@@ -176,22 +199,28 @@ class MyMenu:
 
 
 class TreeFrame(ABC):
-    # tree.tag_configure('ttk', background='yellow')
-    # tree.tag_bind('ttk', '<1>', itemClicked)
     keyImpurity = "impurity"
     keyPrediction = "prediction"
     keyAttrSplit = "attrSplit"
     def __init__(self, master, dcTree, parent, packSide=BOTTOM):
+        """
+        :param master: The root frame where this view will be inserted
+        :param dcTree: A DecisionTree
+        :param parent: The parent frame
+        :param packSide: How to pack this view
+        Creates a frame that displays a DecisionTree. Abstract class
+        """
         self.dcTree = dcTree
         self.master = master
         self.parent = parent
         self.mapNode = dict() # diccionary that translates the id of a node in the GUI to a node from the class decisionTree
 
+        # Set up the GUI Tree
         self.gui_tree = ttk.Treeview(master, height=30)
         self.gui_tree["columns"] = (TreeFrame.keyImpurity, TreeFrame.keyPrediction, TreeFrame.keyAttrSplit)
-        self.gui_tree.column(TreeFrame.keyImpurity, width=100)
-        self.gui_tree.column(TreeFrame.keyPrediction, width=100)
-        self.gui_tree.column(TreeFrame.keyAttrSplit, width=100)
+        self.gui_tree.column(TreeFrame.keyImpurity, width=100) # information about the impurity
+        self.gui_tree.column(TreeFrame.keyPrediction, width=100) # information about the prediction
+        self.gui_tree.column(TreeFrame.keyAttrSplit, width=100) # information about the attribute used to split the node
         self.gui_tree.heading(TreeFrame.keyImpurity, text=lg.inforImpurity)
         self.gui_tree.heading(TreeFrame.keyPrediction, text=lg.infoPrediction)
         self.gui_tree.heading(TreeFrame.keyAttrSplit, text=lg.infoAttrSplit)
@@ -199,6 +228,7 @@ class TreeFrame(ABC):
         self.tree_root_id = self.gui_tree.insert('', 'end', text=str(self.dcTree.getNumElems()),
                                          values=(str(self.dcTree.getImpurity()), str(self.dcTree.getPrediction()),
                                                  str(self.dcTree.getAttrSplit())))
+        # update mapNode with the root DecisionTree
         self.mapNode[self.tree_root_id] = dcTree
         self.addNodes(self.tree_root_id, dcTree)
 
@@ -207,6 +237,11 @@ class TreeFrame(ABC):
         self.gui_tree.pack(side=packSide)
 
     def addNodes(self, rootGUI, rootDT):
+        """
+        :param rootGUI: Identifier of a node in the GUI
+        :param rootDT: A node of the DecisionTree
+        Add recursivelly all the sons that rootDT has to the rootGUI. rootGUI and rootDT must represent the same node
+        """
         self.gui_tree.set(rootGUI, TreeFrame.keyAttrSplit, str(rootDT.getAttrSplit()))
         for (i, son) in enumerate(rootDT.getSons()):
             idSon = self.gui_tree.insert(rootGUI, 'end', text=str(son.getNumElems()),
@@ -215,18 +250,35 @@ class TreeFrame(ABC):
             self.addNodes(idSon, son)
 
     def refreshInfoNodes(self, rootGUI, rootDT):
+        """
+        :param rootGUI: Identifier of a node in the GUI
+        :param rootDT: A node of the DecisionTree
+        Updates all the information displayed in rootGUI and all its sons recursivelly using the data from rootDT.
+        rootGUI and rootDT must represent the same node
+        """
         self.gui_tree.set(rootGUI, TreeFrame.keyImpurity, str(rootDT.getImpurity()))
         for (i, son) in enumerate(rootDT.getSons()):
             self.refreshInfoNodes(self.gui_tree.get_children(rootGUI)[i], son)
 
     def nodeClicked(self, event):
+        """
+        Function used to catch a left clic event in the GUI Tree
+        """
         pass
 
     def predict_cv(self, X, naiveBayes):
+        """
+        :param X: A matrix containing the data that will be predicted
+        :param naiveBayes: If true, the Naive Bayes predictor will be used
+        :return: Calls the predict function from the DecisionTree and returns its value
+        """
         return self.dcTree.predict(X, naiveBayes)
 
 
 class TreeFrameEdit(TreeFrame):
+    """
+    Class that extends the TreeFrame abstract class
+    """
     def getSegData(self, selectedAttr):
         node = self.mapNode[self.gui_tree.focus()]
         segData = node.getSegmentedData(self.dcTree.attrNames.index(selectedAttr))
