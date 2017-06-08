@@ -1,14 +1,12 @@
-import pandas as pd
-from sklearn.cluster import KMeans
-from sklearn.naive_bayes import MultinomialNB, BernoulliNB, GaussianNB
-from sklearn.metrics import silhouette_score
-import multiprocessing
-import time
-import math
-import operator
-import numpy as np
 import functools
-import pickle
+import math
+import multiprocessing
+
+import numpy as np
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
+from sklearn.naive_bayes import MultinomialNB, GaussianNB
+
 
 # Functions to evaluate the performance of a split #
 
@@ -485,43 +483,3 @@ class DecisionTree:
         for i in range(len(self.sons)):
             strTree += (self.level + 1) * '\t' + str(i) + ' -> ' + self.sons[i].__str__()
         return strTree
-
-if False:
-    df = pd.read_csv('dadesSantPauProc.csv')
-    df2 = df.get(['diesIngr', 'nIngr', 'nUrg', 'estacioAny', 'diagPrinc']) # 'diagPrinc'
-    df3 = df.get(['reingres'])
-    aux2 = df2.values.tolist()
-    aux3 = df3.values.flatten().tolist()
-    dcTree = DecisionTree(aux2, aux3, [True, False], f=gini)
-    t = time.time()
-    # dcTree.autoSplit(minSetSize=100, giniReduction=0.01)
-    dcTree.splitNode(4)
-    # for son in dcTree.sons:
-    #     if gini(son.y, son.classes) > 0.38:
-    #         son.splitNode(2)
-    print(dcTree)
-    print(time.time() - t)
-    t = time.time()
-    exit(0)
-
-    while True:
-        try:
-            exec(input())
-        except Exception as e:
-            print(e)
-
-    ll = dcTree.predict(aux2)
-    print(fScore(ll, aux3))
-    print(time.time() - t)
-
-    # y = [0.5 < random.random() for i in range(5000000)]
-    # print(y.count(True))
-    # t = time.clock()
-    # print(gini(y, [True, False]), time.clock() - t)
-
-    # interactive
-    while True:
-        try:
-            eval(input())
-        except:
-            pass

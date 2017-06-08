@@ -1,26 +1,21 @@
-from functools import partial
-from tkinter import *
-import tkinter.ttk as ttk
+import pickle
 import tkinter.filedialog as fDialog
 import tkinter.messagebox as tkMessageBox
-import pandas as pd
-from collections import Counter
-import decisionTree
+import tkinter.ttk as ttk
 from abc import ABC
-import functools
-import math
-import pickle
-from sklearn.metrics import roc_curve, roc_auc_score, auc
+from collections import Counter
+from tkinter import *
 
 import matplotlib
+import pandas as pd
+from sklearn.metrics import roc_curve, auc
+
+import decisionTree
+
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
-from numpy import arange, sin, pi
 import numpy as np
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
-# implement the default mpl key bindings
-from matplotlib.backend_bases import key_press_handler
-
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
 
