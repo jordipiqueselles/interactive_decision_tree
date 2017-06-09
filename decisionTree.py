@@ -163,7 +163,7 @@ class DecisionTree:
         self.sons = []
         self.X = X
         self.y = y
-        self.classes = classes
+        self.classes = sorted(classes)
         self.level = level
         self.f = f
         self.condition = condition
@@ -180,6 +180,7 @@ class DecisionTree:
         self.gaussNB = GaussianNB()
         Xnum = [[atr for atr in elem if type(atr) == float or type(atr) == int] for elem in X]
         self.gaussNB.fit(Xnum, y)
+        # self.gaussNB.classes_ = np.array(self.classes)
 
         # Naive Bayes classifier (multinomial)
         Xcat = [[atr for atr in elem if type(atr) != float and type(atr) != int] for elem in X]
@@ -195,12 +196,14 @@ class DecisionTree:
             Xmult.append(ll)
         self.multNB = MultinomialNB()
         self.multNB.fit(Xmult, y)
+        # self.multNB.classes_ = np.array(self.classes)
 
     def __transformToBinary(self, row):
         ll = []
         for i in range(len(row)):
             auxLL = [0] * len(self.typesCat[i])
-            auxLL[self.typesCat[i].index(row[i])] = 1
+            if row[i] in self.typesCat[i]:
+                auxLL[self.typesCat[i].index(row[i])] = 1
             ll += auxLL
         return ll
 
@@ -297,8 +300,6 @@ class DecisionTree:
         # print(d)
         # diccionary that translates the index that kmeans gives to a cluster to the index of this cluster ordered
         auxDict = dict((elem[0], i) for (i, elem) in enumerate(sorted(enumerate(kmeans.cluster_centers_.flatten().tolist()), key=lambda x: x[1])))
-        print(sorted(enumerate(kmeans.cluster_centers_.flatten().tolist()), key=lambda x: x[1]))
-        print(auxDict)
         for (i, prt) in enumerate(predict):
             d[auxDict[prt]][0].append(i)
         delEmptyEntries(d)
@@ -386,19 +387,20 @@ class DecisionTree:
             raise Exception('First value of', ll, 'out of range')
         return self.sons[ll[0]].getNode(ll[1:])
 
-    def __bayesPredict(self, node, elem):
+    def __bayesPredict(self, elem):
         """
-        :param node: A DecisionTree
         :param elem: An element to predict
-        :return: The prediction of elem based on the Naive Bayes classifier in node
+        :return: The prediction of elem based on the Naive Bayes classifier
         """
         numVar = list(filter(lambda x: type(x) == int or type(x) == float, elem))
         catVar = list(filter(lambda x: type(x) != int and type(x) != float, elem))
-        catVarBinary = node.__transformToBinary(catVar)
-        prGauss = node.gaussNB.predict_proba([numVar]).flatten()
-        prMult = node.multNB.predict_proba([catVarBinary]).flatten()
-        return [(prGauss[i] * prMult[i] / prCls, cls) for (i, (prCls, cls)) in enumerate(sorted(node.classNode, key=lambda x: x[1]))]
-
+        catVarBinary = self.__transformToBinary(catVar)
+        prGauss = self.gaussNB.predict_proba([numVar]).flatten()
+        prMult = self.multNB.predict_proba([catVarBinary]).flatten()
+        # return [(prGauss[i] * prMult[i] / prCls, cls) for (i, (prCls, cls)) in enumerate(sorted(self.classNode, key=lambda x: x[1]))]
+        # return [((prGauss[i] + prMult[i]) / 2 , cls) for (i, (prCls, cls)) in enumerate(sorted(self.classNode, key=lambda x: x[1]))]
+        return [((prGauss[i] + prMult[i]) / 2 , cls) for (i, cls) in enumerate(self.classes)]
+        # return prGauss
     def _auxPredict(self, elem, bayes):
         """
         :param elem: An element to predict
@@ -414,8 +416,8 @@ class DecisionTree:
                     currentNode = son
                     t = True
                     break
-        if bayes:
-            return self.__bayesPredict(currentNode, elem)
+        if bayes and len(currentNode.gaussNB.classes_) == len(currentNode.classes):
+            return currentNode.__bayesPredict(elem)
         else:
             return currentNode.classNode
 
@@ -426,8 +428,8 @@ class DecisionTree:
         """
         if not type(X[0]) == list:
             X = [X]
-        pool = multiprocessing.Pool(multiprocessing.cpu_count())
-        pool.close()
+        # pool = multiprocessing.Pool(multiprocessing.cpu_count())
+        # pool.close()
         # return [self._auxPredict(elem) for elem in X]
         # TODO change again to pool.map(...)
         return list(map(functools.partial(self._auxPredict, bayes=bayes), X))
