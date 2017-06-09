@@ -7,6 +7,7 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.naive_bayes import MultinomialNB, GaussianNB
 
+import time
 
 # Functions to evaluate the performance of a split #
 
@@ -222,12 +223,16 @@ class DecisionTree:
         Splits recursively the tree
         """
         # print(self.level) # per debugar
+        t = time.time()
         if len(self.X) > minSetSize:
             (gImp, idxAttr) = self.bestSplit()[0]
             if gImp + giniReduction < self.f(self.y, self.classes):
                 self.splitNode(idxAttr)
                 for son in self.sons:
                     son.autoSplit(minSetSize, giniReduction)
+
+        if self.level == 0:
+            print("Time autosplit:", time.time() - t)
 
     def __generateSubsets(self, idxAttr):
         """
@@ -289,8 +294,11 @@ class DecisionTree:
         clusters = [-math.inf] + sorted(kmeans.cluster_centers_.flatten().tolist()) + [math.inf]
         for i in range(1, len(clusters) - 1):
             d[i-1] = ([], functools.partial(decideNumAtrr, cl0=clusters[i-1], cl1=clusters[i], cl2=clusters[i+1]))
+        # print(d)
         # diccionary that translates the index that kmeans gives to a cluster to the index of this cluster ordered
-        auxDict = dict((i, elem[0]) for (i, elem) in enumerate(sorted(enumerate(kmeans.cluster_centers_.flatten().tolist()), key=lambda x: x[1])))
+        auxDict = dict((elem[0], i) for (i, elem) in enumerate(sorted(enumerate(kmeans.cluster_centers_.flatten().tolist()), key=lambda x: x[1])))
+        print(sorted(enumerate(kmeans.cluster_centers_.flatten().tolist()), key=lambda x: x[1]))
+        print(auxDict)
         for (i, prt) in enumerate(predict):
             d[auxDict[prt]][0].append(i)
         delEmptyEntries(d)
@@ -309,6 +317,7 @@ class DecisionTree:
             newY = [self.y[i] for i in d[elem][0]]
             self.sons.append(DecisionTree(newX, newY, self.classes, self.attrNames, self.level + 1, self.f, d[elem][1], self.perfKmeans, self.staticSplits))
         self.attrSplit = idxAttr
+        # self.sons = sorted(self.sons, key=lambda node: node.X[0][idxAttr])
         return self.sons
 
     def _auxBestSplit(self, i):
@@ -328,8 +337,10 @@ class DecisionTree:
         """
         :return: A sorted list in increasing order of the possible splits
         """
-        pool = multiprocessing.Pool(multiprocessing.cpu_count())
-        ll = pool.map(self._auxBestSplit, range(len(self.X[0]))) # pool.map(self._auxBestSplit, range(len(self.X[0])))
+        # pool = multiprocessing.Pool(multiprocessing.cpu_count())
+        # ll = pool.map(self._auxBestSplit, range(len(self.X[0]))) # pool.map(self._auxBestSplit, range(len(self.X[0])))
+        # pool.close()
+        ll = list(map(self._auxBestSplit, range(len(self.X[0]))))
         return sorted(ll)
 
     def prune(self):
@@ -416,6 +427,7 @@ class DecisionTree:
         if not type(X[0]) == list:
             X = [X]
         pool = multiprocessing.Pool(multiprocessing.cpu_count())
+        pool.close()
         # return [self._auxPredict(elem) for elem in X]
         # TODO change again to pool.map(...)
         return list(map(functools.partial(self._auxPredict, bayes=bayes), X))

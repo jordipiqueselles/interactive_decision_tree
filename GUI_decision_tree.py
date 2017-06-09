@@ -212,7 +212,7 @@ class TreeFrame(ABC):
         self.mapNode = dict() # diccionary that translates the id of a node in the GUI to a node from the class decisionTree
 
         # Set up the GUI Tree
-        self.gui_tree = ttk.Treeview(master, height=30)
+        self.gui_tree = ttk.Treeview(master, height=25)
         self.gui_tree["columns"] = (TreeFrame.keyImpurity, TreeFrame.keyPrediction, TreeFrame.keyAttrSplit)
         self.gui_tree.column(TreeFrame.keyImpurity, width=100) # information about the impurity
         self.gui_tree.column(TreeFrame.keyPrediction, width=100) # information about the prediction
@@ -367,8 +367,8 @@ class EditTreeGUI:
         self.dcTree = dcTree
         self.X_cv = X_cv
         self.y_cv = y_cv
-        self.minSetSize = 1000
-        self.minImpRed = 0.01
+        self.minSetSize = 40
+        self.minImpRed = 0.001
         self.naiveBayes = False
 
         # Left Frame #
@@ -420,7 +420,7 @@ class EditTreeGUI:
         rightFrame = Frame(self.master, padx=10, pady=10)
         rightFrame.pack(side=RIGHT, anchor=S+E)
         # The plot
-        self.figure = Figure(figsize=(7, 6), dpi=100)
+        self.figure = Figure(figsize=(7, 5), dpi=100)
         self.canvas = FigureCanvasTkAgg(self.figure, master=rightFrame)
         self.canvas.show()
         self.canvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=1)
@@ -588,7 +588,7 @@ class AdvancedOptionsGUI:
         # f_Kmeans
         Label(topFrame, text=lg.fPerfKmeans).grid(row=3, column=0)
         self.tkvarFKmeans = StringVar(topFrame)
-        if self.dcTree.perfKmeans == decisionTree.silhouette_score:
+        if self.dcTree.perfKmeans == decisionTree.perfKmeansSilhouette:
             self.tkvarFKmeans.set(lg.silhouette) # set the default option
         elif self.dcTree.perfKmeans == decisionTree.perfKmeanVar:
             self.tkvarFKmeans.set(lg.varRed) # set the default option
@@ -667,7 +667,7 @@ class AdvancedOptionsGUI:
         elif self.tkvarFImp.get() == lg.entropy:
             self.dcTree.f = decisionTree.entropy
         if self.tkvarFKmeans.get() == lg.silhouette:
-            self.dcTree.perfKmeans = decisionTree.silhouette_score
+            self.dcTree.perfKmeans = decisionTree.perfKmeansSilhouette
         elif self.tkvarFKmeans.get() == lg.varRed:
             self.dcTree.perfKmeans = decisionTree.perfKmeanVar
         self.dcTree.staticSplits = dictHowToSplit
@@ -778,12 +778,12 @@ class PredictGUI:
         df.to_csv(path_or_buf=file.name + '_prediction.csv')
         tkMessageBox.showinfo('', lg.predictionDone)
 
-
-lg = Language()
-root = Tk()
-w, h = root.winfo_screenwidth(), root.winfo_screenheight()
-root.geometry("%dx%d+0+0" % (w, h))
-menu = MyMenu(root)
-root.mainloop()
+if __name__ == '__main__':
+    lg = Language()
+    root = Tk()
+    w, h = root.winfo_screenwidth(), root.winfo_screenheight()
+    root.geometry("%dx%d+0+0" % (w, h))
+    menu = MyMenu(root)
+    root.mainloop()
 
 
