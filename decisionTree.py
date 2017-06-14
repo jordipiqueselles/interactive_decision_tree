@@ -399,8 +399,11 @@ class DecisionTree:
         prMult = self.multNB.predict_proba([catVarBinary]).flatten()
         # return [(prGauss[i] * prMult[i] / prCls, cls) for (i, (prCls, cls)) in enumerate(sorted(self.classNode, key=lambda x: x[1]))]
         # return [((prGauss[i] + prMult[i]) / 2 , cls) for (i, (prCls, cls)) in enumerate(sorted(self.classNode, key=lambda x: x[1]))]
-        return [((prGauss[i] + prMult[i]) / 2 , cls) for (i, cls) in enumerate(self.classes)]
-        # return prGauss
+        # return [((prGauss[i] + prMult[i]) / 2 , cls) for (i, cls) in enumerate(self.classes)]
+        listProb = [(prGauss[i] * prMult[i] / prCls, cls) for (i, (prCls, cls)) in enumerate(self.classNode)]
+        sumProb = sum(prob for (prob, cls) in listProb)
+        return [(prCls / sumProb, cls) for (prCls, cls) in listProb]
+
     def _auxPredict(self, elem, bayes):
         """
         :param elem: An element to predict

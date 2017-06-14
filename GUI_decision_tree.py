@@ -8,7 +8,7 @@ from tkinter import *
 
 import matplotlib
 import pandas as pd
-from sklearn.metrics import roc_curve, auc
+from sklearn.metrics import roc_curve, auc, precision_score, recall_score, accuracy_score
 
 import decisionTree
 
@@ -39,6 +39,8 @@ class Language:
         """
         Initialize all the string to English
         """
+        self.title = 'Decision Tree Classifier'
+
         self.autosplit = 'Autosplit'
         self.prune = 'Prune'
         self.join = 'Join'
@@ -464,9 +466,12 @@ class EditTreeGUI:
         """
         Calculates the accuracy of the DecisionTree using the test data and plots the ROC curve
         """
-        pred_y = self.treeFrame.predict_cv(self.X_cv, self.naiveBayes)
+        pred_y = self.treeFrame.predict_cv(self.X_cv, self.naiveBayes) # [(prob, cls), (prob, cls), ...]
         tags = [self.dcTree.classes[max(enumerate(elem), key=lambda x: x[1])[0]] for elem in pred_y]
-        accuracy = sum([elem[0] == elem[1] for elem in zip(self.y_cv, tags)]) / len(self.y_cv)
+        # accuracy = sum([elem[0] == elem[1] for elem in zip(self.y_cv, tags)]) / len(self.y_cv)
+        accuracy = accuracy_score(self.y_cv, tags)
+        precision = precision_score(self.y_cv, tags, average='macro')
+        recall = recall_score(self.y_cv, tags, average='macro')
 
         fpr = dict() # false positives
         tpr = dict() # true positives
@@ -477,7 +482,8 @@ class EditTreeGUI:
             fpr[i], tpr[i], _ = roc_curve(y_cv, prob[:, i], pos_label=self.dcTree.classes[i])
             area = round(auc(fpr[i], tpr[i]), 2)
             plt.plot(fpr[i], tpr[i], label=str(self.dcTree.classes[i]) + ' (area: ' + str(area) + ')')
-        plt.title(lg.accuracy + str(round(accuracy, 4)))
+        plt.title(lg.accuracy + str(round(accuracy, 4)) + ' | Precision: ' + str(round(precision, 4)) +
+                  ' | Recall: ' + str(round(recall, 4)))
         plt.xlabel(lg.fpr)
         plt.ylabel(lg.tpr)
         plt.legend(loc="lower right")
@@ -498,7 +504,7 @@ class EditTreeGUI:
         # TODO Una mica lleig, intentar compactar el codi i fer-lo mes clar
         if type(segData[0][0]) == int or type(segData[0][0]) == float:
             rang = (min(min(elem) for elem in segData), max(max(elem) for elem in segData))
-            nBins = min(30, max([len(set(d)) for d in segData]))
+            nBins = min(300, max([len(set(d)) for d in segData]))
             auxHist = [0] * nBins
             for (i, data) in enumerate(segData):
                 h = subPlot.hist(data, bins=nBins, range=rang, bottom=auxHist, label=str(self.dcTree.classes[i]))
@@ -781,9 +787,8 @@ class PredictGUI:
 if __name__ == '__main__':
     lg = Language()
     root = Tk()
+    root.title = lg.title
     w, h = root.winfo_screenwidth(), root.winfo_screenheight()
     root.geometry("%dx%d+0+0" % (w, h))
     menu = MyMenu(root)
     root.mainloop()
-
-

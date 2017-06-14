@@ -7,8 +7,8 @@ import pylab
 
 def readDataSet ():
     ll = list()
-    with open('2008_2014_TANCAT.csv', 'rt') as csvfile:
-        reader = csv.DictReader(csvfile, delimiter=';', quotechar='|')
+    with open('2008_2014_TANCAT_sense_V.csv', 'rt') as csvfile:
+        reader = csv.DictReader(csvfile, delimiter=',', quotechar='|')
         for row in reader:
             auxDict = dict()
             auxDict['id'] = row["CIP"]
@@ -19,10 +19,10 @@ def readDataSet ():
             auxDict['dataIn'] = datetime.date(int(row["D_ingres"][:4]), int(row["D_ingres"][4:6]), int(row["D_ingres"][6:]))
             auxDict['dataOut'] = datetime.date(int(row["D_alta"][:4]), int(row["D_alta"][4:6]), int(row["D_alta"][6:]))
             if (datetime.date(2015, 1, 1) - auxDict['dataOut']).days < 30:
-                continue
+                continue # no pots arribar a saber si ha patit un reingres
             tipus = int('0'+row["C_ingres"]) # 1 -> urgent; 2 -> programat
             auxDict['diagPrinc'] = '_' + familiesDiag[max([i*(row["DP"][:3] >= familiesDiag[i]) for i in range(len(familiesDiag))])]
-            auxDict['altresDiag'] = [row["DS"+str(i)][:4] for i in range(1,9)]
+            auxDict['diagSec'] = '_' + familiesDiag[max([i*(row["DS1"][:3] >= familiesDiag[i]) for i in range(len(familiesDiag))])]
 
             # Dades que es dedueixen d'altres dades
             auxDict['diesIngr'] = (auxDict['dataOut'] - auxDict['dataIn']).days
@@ -45,6 +45,6 @@ def readDataSet ():
 # families de diagnostics
 familiesDiag = ['001', '140', '240', '280', '290', '320', '360', '390', '460', '520', '580', '630', \
                 '680', '710', '740', '760', '780', '800']
-df = pd.DataFrame(data=readDataSet(), columns=['id', 'diesIngr', 'nIngr', 'nUrg', 'estacioAny', \
-                                               'diagPrinc', 'altresDiag', 'reingres'])
+df = pd.DataFrame(data=readDataSet(), columns=['diesIngr', 'nIngr', 'nUrg', 'estacioAny', \
+                                               'diagPrinc', 'diagSec', 'reingres'])
 df.to_csv(path_or_buf='dadesSantPauProc.csv')
