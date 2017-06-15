@@ -29,20 +29,6 @@ def entropy(y, classes):
     ll = (y.count(c) / len(y) for c in classes)
     return sum(-pr*math.log2(pr+1E-60) for pr in ll)
 
-# Functions to evaluate the general performance of the predictive model #
-
-def accuracy(pred, real):
-    return sum(map(lambda x: x[0] == x[1], zip(pred, real))) / len(pred)
-
-def precision(pred, real):
-    return sum(map(lambda x: x[0] and x[1], zip(pred, real))) / sum(pred)
-
-def recall(pred, real):
-    return sum(map(lambda x: x[0] and x[1], zip(pred, real))) / sum(real)
-
-def fScore(pred, real):
-    return 2 * precision(pred, real) * recall(pred, real) / (precision(pred, real) + recall(pred, real))
-
 # Functions used to do some calculations that cannot be done by a lambda function because the code is parallelized
 # in some parts and it cannot acces to a local function as a lambda can be #
 
@@ -103,7 +89,10 @@ def perfKmeansSilhouette(x, predict, kmeans=None, i=None):
     :return: The silhouette score
     """
     # the sample size should be not too large
-    return -silhouette_score(x, predict, sample_size=1000) # valor petit -> millor
+    try:
+        return -silhouette_score(x, predict, sample_size=1000) # valor petit -> millor
+    except Exception:
+        return 0
 
 # Aux functions #
 
@@ -402,7 +391,10 @@ class DecisionTree:
         # return [((prGauss[i] + prMult[i]) / 2 , cls) for (i, cls) in enumerate(self.classes)]
         listProb = [(prGauss[i] * prMult[i] / prCls, cls) for (i, (prCls, cls)) in enumerate(self.classNode)]
         sumProb = sum(prob for (prob, cls) in listProb)
-        return [(prCls / sumProb, cls) for (prCls, cls) in listProb]
+        if round(sumProb, 4) == 0:
+            return [(1 / len(self.classes), cls) for (prCls, cls) in listProb]
+        else:
+            return [(prCls / sumProb, cls) for (prCls, cls) in listProb]
 
     def _auxPredict(self, elem, bayes):
         """

@@ -369,8 +369,8 @@ class EditTreeGUI:
         self.dcTree = dcTree
         self.X_cv = X_cv
         self.y_cv = y_cv
-        self.minSetSize = 40
-        self.minImpRed = 0.001
+        self.minSetSize = 1000
+        self.minImpRed = 0.01
         self.naiveBayes = False
 
         # Left Frame #
