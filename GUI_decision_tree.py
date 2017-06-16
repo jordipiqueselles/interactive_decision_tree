@@ -50,6 +50,7 @@ class Language:
         self.validate = 'Validate'
         self.varSplit = 'Variable split'
         self.naiveBayes = 'Naive Bayes'
+        self.bestTree = 'Best Tree'
 
         self.infoNumElems = 'Number of elements'
         self.infoAccuray = 'Accuracy'
@@ -89,6 +90,8 @@ class Language:
         self.tpr = 'True Positive Rate'
         self.rocCurve = 'ROC curve'
         self.predictionDone = 'Prediction done!'
+        self.precision = ' | Precision: '
+        self.recall = ' | Recall: '
 
     def setSpanish(self):
         """
@@ -298,6 +301,12 @@ class TreeFrameEdit(TreeFrame):
         dcTree.autoSplit(minSetSize=minSetSize, giniReduction=giniReduction)
         self.addNodes(self.gui_tree.focus(), dcTree)
 
+    def updateTreeView(self):
+        for node in self.gui_tree.get_children(self.tree_root_id):
+            self.mapNode.pop(node)
+            self.gui_tree.delete(node)
+        self.addNodes(self.tree_root_id, self.dcTree)
+
     def joinNodes(self):
         """
         Joins the selected nodes into one
@@ -407,16 +416,20 @@ class EditTreeGUI:
         b_bestSplit = Button(buttonsFrame, text=lg.bestSplit)
         b_bestSplit.grid(row=1, column=2, sticky=N+S+E+W)
         b_bestSplit.bind('<Button-1>', self.bestSplit)
+        # Button best split
+        b_split = Button(buttonsFrame, text=lg.split)
+        b_split.grid(row=0, column=3, sticky=N+S+E+W)
+        b_split.bind('<Button-1>', self.split)
+        # Button best tree
+        b_bestTree = Button(buttonsFrame, text=lg.bestTree)
+        b_bestTree.grid(row=1, column=3, sticky=N+S+E+W)
+        b_bestTree.bind('<Button-1>', self.bestTree)
         # Option Menu
         self.tkvar = StringVar(root)
         self.tkvar.set(self.dcTree.attrNames[0]) # set the default option
         self.tkvar.trace('w', self.optionMenuClicked)
         self.popupMenu = OptionMenu(buttonsFrame, self.tkvar, *self.dcTree.attrNames)
-        self.popupMenu.grid(row=0, column=3, sticky=N+S+E+W)
-        # Button best split
-        b_split = Button(buttonsFrame, text=lg.split)
-        b_split.grid(row=1, column=3, sticky=N+S+E+W)
-        b_split.bind('<Button-1>', self.split)
+        self.popupMenu.grid(row=0, column=4, sticky=N+S+E+W)
 
         # Right Frame #
         rightFrame = Frame(self.master, padx=10, pady=10)
@@ -427,6 +440,13 @@ class EditTreeGUI:
         self.canvas.show()
         self.canvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=1)
         self.changePlot()
+
+    def bestTree(self, event):
+        """
+        Calls the TreeFrame.bestTree() method
+        """
+        self.dcTree.bestTree(self.X_cv, self.y_cv, self.minImpRed)
+        self.treeFrame.updateTreeView()
 
     def joinNodes(self, event):
         """
@@ -482,8 +502,8 @@ class EditTreeGUI:
             fpr[i], tpr[i], _ = roc_curve(y_cv, prob[:, i], pos_label=self.dcTree.classes[i])
             area = round(auc(fpr[i], tpr[i]), 2)
             plt.plot(fpr[i], tpr[i], label=str(self.dcTree.classes[i]) + ' (area: ' + str(area) + ')')
-        plt.title(lg.accuracy + str(round(accuracy, 4)) + ' | Precision: ' + str(round(precision, 4)) +
-                  ' | Recall: ' + str(round(recall, 4)))
+        plt.title(lg.accuracy + str(round(accuracy, 4)) + lg.precision + str(round(precision, 4)) +
+                  lg.recall + str(round(recall, 4)))
         plt.xlabel(lg.fpr)
         plt.ylabel(lg.tpr)
         plt.legend(loc="lower right")

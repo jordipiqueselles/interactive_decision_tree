@@ -4,7 +4,7 @@ import multiprocessing
 
 import numpy as np
 from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
+from sklearn.metrics import silhouette_score, accuracy_score
 from sklearn.naive_bayes import MultinomialNB, GaussianNB
 
 import time
@@ -225,6 +225,49 @@ class DecisionTree:
 
         if self.level == 0:
             print("Time autosplit:", time.time() - t)
+
+    def bestTree(self, X_cv, y_cv, minImp):
+        minNodeSize = 10
+        maxNodeSize = 0.1 * len(self.y)
+        rightPoint = minNodeSize + round((maxNodeSize - minNodeSize) * 0.618)
+        leftPoint = maxNodeSize - round((maxNodeSize - minNodeSize) * 0.618)
+
+        self.autoSplit(minSetSize=leftPoint, giniReduction=minImp)
+        pred_y = self.predict(X_cv, False) # [(prob, cls), (prob, cls), ...]
+        tags = [self.classes[max(enumerate(elem), key=lambda x: x[1])[0]] for elem in pred_y]
+        accuracyLeft = accuracy_score(y_cv, tags)
+
+        self.autoSplit(minSetSize=rightPoint, giniReduction=minImp)
+        pred_y = self.predict(X_cv, False) # [(prob, cls), (prob, cls), ...]
+        tags = [self.classes[max(enumerate(elem), key=lambda x: x[1])[0]] for elem in pred_y]
+        accuracyRight = accuracy_score(y_cv, tags)
+
+        print("left_point ->", str(leftPoint), "| right_point ->", rightPoint)
+        print("accuracy_left ->", str(accuracyLeft), "| accuracy_right ->", accuracyRight)
+
+        while rightPoint - leftPoint > 10:
+            if accuracyLeft < accuracyRight:
+                minNodeSize = leftPoint
+                leftPoint = rightPoint
+                accuracyLeft = accuracyRight
+                rightPoint = minNodeSize + round((maxNodeSize - minNodeSize) * 0.618)
+                self.autoSplit(minSetSize=rightPoint, giniReduction=minImp)
+                pred_y = self.predict(X_cv, False) # [(prob, cls), (prob, cls), ...]
+                tags = [self.classes[max(enumerate(elem), key=lambda x: x[1])[0]] for elem in pred_y]
+                accuracyRight = accuracy_score(y_cv, tags)
+            else:
+                maxNodeSize = rightPoint
+                rightPoint = leftPoint
+                accuracyRight = accuracyLeft
+                leftPoint = maxNodeSize - round((maxNodeSize - minNodeSize) * 0.618)
+                self.autoSplit(minSetSize=leftPoint, giniReduction=minImp)
+                pred_y = self.predict(X_cv, False) # [(prob, cls), (prob, cls), ...]
+                tags = [self.classes[max(enumerate(elem), key=lambda x: x[1])[0]] for elem in pred_y]
+                accuracyLeft = accuracy_score(y_cv, tags)
+
+            print("left_point ->", str(leftPoint), "| right_point ->", rightPoint)
+            print("accuracy_left ->", str(accuracyLeft), "| accuracy_right ->", accuracyRight)
+
 
     def __generateSubsets(self, idxAttr):
         """
