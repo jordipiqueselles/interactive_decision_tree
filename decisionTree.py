@@ -1,6 +1,7 @@
 import functools
 import math
 import multiprocessing
+import random
 
 import numpy as np
 from sklearn.cluster import KMeans
@@ -315,16 +316,21 @@ class DecisionTree:
         :return:
         Splits the dataset using an attribute that has a numerical value
         """
-        x = [elem[idxAttr] for elem in self.X]
-        x = np.array(x).reshape(-1,1)
+        ll_idx = list(range(len(self.X)))
+        random.shuffle(ll_idx)
+        # take a maximum of 3000 random elements from self.X to run Kmeans
+        x_train = [self.X[idx][idxAttr] for idx in ll_idx[:min(len(ll_idx), 3000)]]
+        x_train = np.array(x_train).reshape(-1,1)
         if idxAttr in self.staticSplits:
             cls_centers = self.staticSplits[idxAttr]
             kmeans = KMeans(n_clusters=len(cls_centers))
             kmeans.cluster_centers_ = np.array(cls_centers).reshape(-1,1)
         else:
-            kmeans = automaticClustering(i, x, self.perfKmeans)
+            kmeans = automaticClustering(i, x_train, self.perfKmeans)
 
-        predict = kmeans.predict(x)
+        x_pred = [elem[idxAttr] for elem in self.X]
+        x_pred = np.array(x_pred).reshape(-1,1)
+        predict = kmeans.predict(x_pred)
         d = dict()
         clusters = [-math.inf] + sorted(kmeans.cluster_centers_.flatten().tolist()) + [math.inf]
         for i in range(1, len(clusters) - 1):
