@@ -138,7 +138,8 @@ def automaticClustering(i, x, perfKmeans):
 # The main class #
 
 class DecisionTree:
-    def __init__(self, X, y, classes, attrNames=[], level=0, f=gini, condition=alwaysTrue, perfKmeans=perfKmeanVar, staticSplits=dict()):
+    def __init__(self, X, y, classes, attrNames=[], level=0, f=gini, condition=alwaysTrue, perfKmeans=perfKmeanVar,
+                 staticSplits=dict(), attrUsed=set()):
         """
         :param X: Matrix with n rows, each row representing a sample, and m columns, each column representing the attributes of the sample
         :param y: Vector of n elements, each element i representing the value that corresponds to the ith entry in the matrix X
@@ -160,6 +161,7 @@ class DecisionTree:
         self.perfKmeans = perfKmeans
         # staticSplits ha de ser coherent i amb el format correcte. No cal que sigui exhaustiu
         self.staticSplits = staticSplits#{4: [['_001', '_140', '_240', '_280', '_290', '_320', '_360', '_390', '_460', '_520', '_580', '_630'], ['_680', '_710', '_740', '_760', '_780', '_800']]}#{2: [1,3,5,7]}
+        self.attrUsed = attrUsed
         self.classNode = [(round(self.y.count(cls)/len(y), 3), cls) for cls in self.classes]
         if len(attrNames) != len(X[0]):
             self.attrNames = list(range(len(X[0])))
@@ -217,7 +219,7 @@ class DecisionTree:
         """
         # print(self.level) # per debugar
         t = time.time()
-        if len(self.X) > minSetSize:
+        if len(self.X) > minSetSize and len(self.attrUsed) < len(self.X[0]):
             (gImp, idxAttr) = self.bestSplit()[0]
             if gImp + giniReduction < self.f(self.y, self.classes):
                 self.splitNode(idxAttr)
@@ -232,14 +234,13 @@ class DecisionTree:
         maxNodeSize = 0.1 * len(self.y)
         rightPoint = minNodeSize + round((maxNodeSize - minNodeSize) * 0.618)
         leftPoint = maxNodeSize - round((maxNodeSize - minNodeSize) * 0.618)
+        self.autoSplit(minSetSize=minNodeSize, giniReduction=minImp)
 
-        self.autoSplit(minSetSize=leftPoint, giniReduction=minImp)
-        pred_y = self.predict(X_cv, False) # [(prob, cls), (prob, cls), ...]
+        pred_y = self.predict(X_cv, False, leftPoint) # [(prob, cls), (prob, cls), ...]
         tags = [self.classes[max(enumerate(elem), key=lambda x: x[1])[0]] for elem in pred_y]
         accuracyLeft = accuracy_score(y_cv, tags)
 
-        self.autoSplit(minSetSize=rightPoint, giniReduction=minImp)
-        pred_y = self.predict(X_cv, False) # [(prob, cls), (prob, cls), ...]
+        pred_y = self.predict(X_cv, False, rightPoint) # [(prob, cls), (prob, cls), ...]
         tags = [self.classes[max(enumerate(elem), key=lambda x: x[1])[0]] for elem in pred_y]
         accuracyRight = accuracy_score(y_cv, tags)
 
@@ -252,8 +253,7 @@ class DecisionTree:
                 leftPoint = rightPoint
                 accuracyLeft = accuracyRight
                 rightPoint = minNodeSize + round((maxNodeSize - minNodeSize) * 0.618)
-                self.autoSplit(minSetSize=rightPoint, giniReduction=minImp)
-                pred_y = self.predict(X_cv, False) # [(prob, cls), (prob, cls), ...]
+                pred_y = self.predict(X_cv, False, rightPoint) # [(prob, cls), (prob, cls), ...]
                 tags = [self.classes[max(enumerate(elem), key=lambda x: x[1])[0]] for elem in pred_y]
                 accuracyRight = accuracy_score(y_cv, tags)
             else:
@@ -261,13 +261,17 @@ class DecisionTree:
                 rightPoint = leftPoint
                 accuracyRight = accuracyLeft
                 leftPoint = maxNodeSize - round((maxNodeSize - minNodeSize) * 0.618)
-                self.autoSplit(minSetSize=leftPoint, giniReduction=minImp)
-                pred_y = self.predict(X_cv, False) # [(prob, cls), (prob, cls), ...]
+                pred_y = self.predict(X_cv, False, leftPoint) # [(prob, cls), (prob, cls), ...]
                 tags = [self.classes[max(enumerate(elem), key=lambda x: x[1])[0]] for elem in pred_y]
                 accuracyLeft = accuracy_score(y_cv, tags)
 
             print("left_point ->", str(leftPoint), "| right_point ->", rightPoint)
             print("accuracy_left ->", str(accuracyLeft), "| accuracy_right ->", accuracyRight)
+
+        if accuracyLeft < accuracyRight:
+            return rightPoint
+        else:
+            return leftPoint
 
 
     def __generateSubsets(self, idxAttr):
@@ -354,7 +358,10 @@ class DecisionTree:
         for elem in sorted(d.keys()):
             newX = [self.X[i] for i in d[elem][0]]
             newY = [self.y[i] for i in d[elem][0]]
-            self.sons.append(DecisionTree(newX, newY, self.classes, self.attrNames, self.level + 1, self.f, d[elem][1], self.perfKmeans, self.staticSplits))
+            attrUsed = self.attrUsed.copy()
+            attrUsed.add(idxAttr)
+            self.sons.append(DecisionTree(newX, newY, self.classes, self.attrNames, self.level + 1, self.f, d[elem][1],
+                                          self.perfKmeans, self.staticSplits, attrUsed))
         self.attrSplit = idxAttr
         # self.sons = sorted(self.sons, key=lambda node: node.X[0][idxAttr])
         return self.sons
@@ -379,7 +386,8 @@ class DecisionTree:
         # pool = multiprocessing.Pool(multiprocessing.cpu_count())
         # ll = pool.map(self._auxBestSplit, range(len(self.X[0]))) # pool.map(self._auxBestSplit, range(len(self.X[0])))
         # pool.close()
-        ll = list(map(self._auxBestSplit, range(len(self.X[0]))))
+        # Apply _auxBestSplit to all idxAttr that haven't been used
+        ll = list(map(self._auxBestSplit, filter(lambda x: x not in self.attrUsed, range(len(self.X[0])))))
         return sorted(ll)
 
     def prune(self):
@@ -445,27 +453,28 @@ class DecisionTree:
         else:
             return [(prCls / sumProb, cls) for (prCls, cls) in listProb]
 
-    def _auxPredict(self, elem, bayes):
+    def _auxPredict(self, elem, bayes, minSize):
         """
         :param elem: An element to predict
         :param bayes: If True it uses the Naive Bayes predictor
+        :param minSize: Minimum size of a node in order to descent to his sons
         :return: The prediction of elem
         """
         currentNode = self
-        t = True
-        while t:
-            t = False
+        existSon = True
+        while existSon and len(currentNode.X) >= minSize:
+            existSon = False
             for son in currentNode.sons:
                 if son.condition(elem[currentNode.attrSplit]):
                     currentNode = son
-                    t = True
+                    existSon = True
                     break
         if bayes and len(currentNode.gaussNB.classes_) == len(currentNode.classes):
             return currentNode.__bayesPredict(elem)
         else:
             return currentNode.classNode
 
-    def predict(self, X, bayes=False):
+    def predict(self, X, bayes=False, minSize=0):
         """
         :param X: [[attr1, attr2...], [attr1, attr2...]...]
         :return: y[i] -> [(prob1, class1), (prob2, class2), ...]
@@ -476,7 +485,7 @@ class DecisionTree:
         # pool.close()
         # return [self._auxPredict(elem) for elem in X]
         # TODO change again to pool.map(...)
-        return list(map(functools.partial(self._auxPredict, bayes=bayes), X))
+        return list(map(functools.partial(self._auxPredict, bayes=bayes, minSize=minSize), X))
 
     def getNumElems(self):
         """
