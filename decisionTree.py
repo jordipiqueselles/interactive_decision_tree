@@ -1,4 +1,5 @@
 import functools
+import operator
 import math
 import multiprocessing
 import random
@@ -11,6 +12,17 @@ from sklearn.naive_bayes import MultinomialNB, GaussianNB
 import time
 
 # Functions to evaluate the performance of a split #
+
+def gini_with_distr(ll_distr):
+    totalCount = 0
+    partialGini = 0
+    for distr in ll_distr:
+        s = sum(distr)
+        if s == 0:
+            continue
+        totalCount += s
+        partialGini += sum((elem) * (1 - elem/s) for elem in distr)
+    return partialGini / totalCount
 
 def gini(y, classes):
     """
@@ -38,6 +50,12 @@ def decideCatAttr(x, atr):
     :return: True if x and atr have the same value
     """
     return x == atr
+
+def le(a, b):
+    return a <= b
+
+def gt(a, b):
+    return a > b
 
 def decideNumAtrr(x, cl0, cl1, cl2):
     """
@@ -139,7 +157,7 @@ def automaticClustering(i, x, perfKmeans):
 
 class DecisionTree:
     def __init__(self, X, y, classes, attrNames=[], level=0, f=gini, condition=alwaysTrue, perfKmeans=perfKmeanVar,
-                 staticSplits=dict(), attrUsed=set()):
+                 staticSplits=dict(), binNumSplit=True):
         """
         :param X: Matrix with n rows, each row representing a sample, and m columns, each column representing the attributes of the sample
         :param y: Vector of n elements, each element i representing the value that corresponds to the ith entry in the matrix X
@@ -149,6 +167,7 @@ class DecisionTree:
         :param condition: The condition must accomplish the data from its parent to belong to this node
         :param perfKmeans: Function to evaluate the performance of the clustering of a numerical attribute using kmeans
         :param staticSplits: A dictionary with key -> index of an attribute; value -> how to split this attribute. For a numerical attribute the value is a list of numbers indicating the center of the clusters and for a categorical value is a list of lists, the second list containing the attributes that belong to a cluster
+        :param binNumSplit: Whether to do or not the binary split in the numerical attributes
         """
         self.attrSplit = None
         self.sons = []
@@ -159,9 +178,9 @@ class DecisionTree:
         self.f = f
         self.condition = condition
         self.perfKmeans = perfKmeans
+        self.binNumSplit = binNumSplit
         # staticSplits ha de ser coherent i amb el format correcte. No cal que sigui exhaustiu
         self.staticSplits = staticSplits#{4: [['_001', '_140', '_240', '_280', '_290', '_320', '_360', '_390', '_460', '_520', '_580', '_630'], ['_680', '_710', '_740', '_760', '_780', '_800']]}#{2: [1,3,5,7]}
-        self.attrUsed = attrUsed
         self.classNode = [(round(self.y.count(cls)/len(y), 3), cls) for cls in self.classes]
         if len(attrNames) != len(X[0]):
             self.attrNames = list(range(len(X[0])))
@@ -209,6 +228,10 @@ class DecisionTree:
         """
         newDcTree = DecisionTree(X=dcTree.X, y=dcTree.y, classes=dcTree.classes, attrNames=dcTree.attrNames, level=dcTree.level, f=dcTree.f,
                                  condition=dcTree.condition, perfKmeans=dcTree.perfKmeans, staticSplits=dcTree.staticSplits)
+        # Setting the value of attributes of the class that have been added after the first release of the project
+        # in order to avoid calling an attribute of an old DecisionTree that don't exist
+        if hasattr(dcTree, 'binNumSplit'):
+            newDcTree.binNumSplit = dcTree.binNumSplit
         newDcTree.attrSplit = dcTree.attrSplit
         newDcTree.sons = [DecisionTree.copyVarTree(son) for son in dcTree.sons]
         return newDcTree
@@ -219,7 +242,7 @@ class DecisionTree:
         """
         # print(self.level) # per debugar
         t = time.time()
-        if len(self.X) > minSetSize and len(self.attrUsed) < len(self.X[0]):
+        if len(self.X) > minSetSize:
             (gImp, idxAttr) = self.bestSplit()[0]
             if gImp + giniReduction < self.f(self.y, self.classes):
                 self.splitNode(idxAttr)
@@ -280,7 +303,10 @@ class DecisionTree:
         :return: A diccionary with key -> value of the attribute; value -> indexes of rows that have this attribute value and a function
         """
         if type(self.X[0][idxAttr]) == int or type(self.X[0][idxAttr]) == float:
-            return self.__generateSubsetsNum(idxAttr)
+            if self.binNumSplit:
+                return self.__generateSubsetsNumBinary(idxAttr)
+            else:
+                return self.__generateSubsetsNum(idxAttr)
         else:
             return self.__generateSubsetsCat(idxAttr)
 
@@ -347,6 +373,38 @@ class DecisionTree:
         delEmptyEntries(d)
         return d
 
+    def __generateSubsetsNumBinary(self, idxAttr):
+        # sorting data
+        ll_attrVal_class = sorted(((self.X[i][idxAttr], self.y[i]) for i in range(len(self.X))))
+        # initial distributions
+        ll_distr = [[0] * len(self.classes), [0] * len(self.classes)]
+        for (attr, clss) in ll_attrVal_class:
+            ll_distr[0][self.classes.index(clss)] += 1
+
+        # find the best split point
+        g = gini_with_distr(ll_distr)
+        clss_ant = None
+        attr_ant = None
+        for (i, (attr, clss)) in enumerate(ll_attrVal_class):
+            ll_distr[0][self.classes.index(clss)] -= 1
+            ll_distr[1][self.classes.index(clss)] += 1
+            if clss_ant != clss and attr_ant != attr:
+                new_g = gini_with_distr(ll_distr)
+                if new_g <= g:
+                    g = new_g
+                    splitPoint = attr
+            clss_ant = clss
+            attr_ant = attr
+
+        # create the two distributions based on the split point
+        d = dict()
+        d[0] = ([i for i in range(len(self.X)) if self.X[i][idxAttr] <= splitPoint],
+                functools.partial(le, b=splitPoint))
+        d[1] = ([i for i in range(len(self.X)) if self.X[i][idxAttr] > splitPoint],
+                functools.partial(gt, b=splitPoint))
+        delEmptyEntries(d)
+        return d
+
     def splitNode(self, idxAttr):
         """
         :param idxAttr: Index of the attribute used to split the node
@@ -358,10 +416,8 @@ class DecisionTree:
         for elem in sorted(d.keys()):
             newX = [self.X[i] for i in d[elem][0]]
             newY = [self.y[i] for i in d[elem][0]]
-            attrUsed = self.attrUsed.copy()
-            attrUsed.add(idxAttr)
             self.sons.append(DecisionTree(newX, newY, self.classes, self.attrNames, self.level + 1, self.f, d[elem][1],
-                                          self.perfKmeans, self.staticSplits, attrUsed))
+                                          self.perfKmeans, self.staticSplits, self.binNumSplit))
         self.attrSplit = idxAttr
         # self.sons = sorted(self.sons, key=lambda node: node.X[0][idxAttr])
         return self.sons
@@ -387,7 +443,7 @@ class DecisionTree:
         # ll = pool.map(self._auxBestSplit, range(len(self.X[0]))) # pool.map(self._auxBestSplit, range(len(self.X[0])))
         # pool.close()
         # Apply _auxBestSplit to all idxAttr that haven't been used
-        ll = list(map(self._auxBestSplit, filter(lambda x: x not in self.attrUsed, range(len(self.X[0])))))
+        ll = list(map(self._auxBestSplit, range(len(self.X[0]))))
         return sorted(ll)
 
     def prune(self):
@@ -412,7 +468,8 @@ class DecisionTree:
             # lambda x: newCondition(x) or self.sons[i].condition(x)
             newCondition = functools.partial(joinConditions, cond1=newCondition, cond2=self.sons[i].condition)
             self.sons.pop(i)
-        joinedNode = DecisionTree(newX, newY, self.classes, self.attrNames, self.level + 1, self.f, newCondition, self.perfKmeans, self.staticSplits)
+        joinedNode = DecisionTree(newX, newY, self.classes, self.attrNames, self.level + 1, self.f, newCondition,
+                                  self.perfKmeans, self.staticSplits, self.binNumSplit)
         self.sons.append(joinedNode)
         return joinedNode
 
@@ -536,6 +593,7 @@ class DecisionTree:
         """
         for son in self.sons:
             son.f = self.f
+            son.binNumSplit = self.binNumSplit
             son.perfKmeans = self.perfKmeans
             son.staticSplits = self.staticSplits
 

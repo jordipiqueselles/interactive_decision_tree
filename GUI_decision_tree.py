@@ -73,7 +73,7 @@ class Language:
         self.minSetSize = 'Min dataset size'
         self.minImpReduction = 'Min impurity reduction'
         self.fImp = 'Function impurity'
-        self.fPerfKmeans = 'Performance Kmeans'
+        self.fNumSplit = 'Numerical split'
         self.variable = 'Variable'
         self.howToSplit = 'How to split'
         self.accept = 'Accept'
@@ -82,8 +82,9 @@ class Language:
 
         self.gini = 'Gini'
         self.entropy = 'Entropy'
-        self.silhouette = 'Silhouette'
-        self.varRed = 'Variance reduction'
+        self.binNumSplit = 'Binary split'
+        self.silhouette = 'Kmeans (Silhouette)'
+        self.varRed = 'Kmeans (Variance reduction)'
         self.error = 'Error'
 
         self.fpr = 'False Positive Rate'
@@ -612,15 +613,18 @@ class AdvancedOptionsGUI:
         self.menuFImp = OptionMenu(topFrame, self.tkvarFImp, *[lg.gini, lg.entropy])
         self.menuFImp.grid(row=2, column=1)
         # f_Kmeans
-        Label(topFrame, text=lg.fPerfKmeans).grid(row=3, column=0)
-        self.tkvarFKmeans = StringVar(topFrame)
-        if self.dcTree.perfKmeans == decisionTree.perfKmeansSilhouette:
-            self.tkvarFKmeans.set(lg.silhouette) # set the default option
-        elif self.dcTree.perfKmeans == decisionTree.perfKmeanVar:
-            self.tkvarFKmeans.set(lg.varRed) # set the default option
+        Label(topFrame, text=lg.fNumSplit).grid(row=3, column=0)
+        self.tkvarNumSplit = StringVar(topFrame)
+        if self.dcTree.binNumSplit:
+            self.tkvarNumSplit.set(lg.binNumSplit)  # set the default option
+        else:
+            if self.dcTree.perfKmeans == decisionTree.perfKmeansSilhouette:
+                self.tkvarNumSplit.set(lg.silhouette) # set the default option
+            elif self.dcTree.perfKmeans == decisionTree.perfKmeanVar:
+                self.tkvarNumSplit.set(lg.varRed) # set the default option
         # self.tkvarFKmeans.trace('w', self.fImpSelected)
-        self.menuFKmeans = OptionMenu(topFrame, self.tkvarFKmeans, *[lg.silhouette, lg.varRed])
-        self.menuFKmeans.grid(row=3, column=1)
+        self.menuNumSplit = OptionMenu(topFrame, self.tkvarNumSplit, *[lg.binNumSplit, lg.silhouette, lg.varRed])
+        self.menuNumSplit.grid(row=3, column=1)
         # Naive Bayes
         Label(topFrame, text=lg.naiveBayes).grid(row=4, column=0)
         self.varNB = IntVar(topFrame)
@@ -688,14 +692,20 @@ class AdvancedOptionsGUI:
                 dictHowToSplit[i] = eval(auxEntry.get())
 
         # set the new values to the dcTree
+        # gini or entropy
         if self.tkvarFImp.get() == lg.gini:
             self.dcTree.f = decisionTree.gini
         elif self.tkvarFImp.get() == lg.entropy:
             self.dcTree.f = decisionTree.entropy
-        if self.tkvarFKmeans.get() == lg.silhouette:
-            self.dcTree.perfKmeans = decisionTree.perfKmeansSilhouette
-        elif self.tkvarFKmeans.get() == lg.varRed:
-            self.dcTree.perfKmeans = decisionTree.perfKmeanVar
+        # numerical split
+        if self.tkvarNumSplit.get() == lg.binNumSplit:
+            self.dcTree.binNumSplit = True
+        else:
+            self.dcTree.binNumSplit = False
+            if self.tkvarNumSplit.get() == lg.silhouette:
+                self.dcTree.perfKmeans = decisionTree.perfKmeansSilhouette
+            elif self.tkvarNumSplit.get() == lg.varRed:
+                self.dcTree.perfKmeans = decisionTree.perfKmeanVar
         self.dcTree.staticSplits = dictHowToSplit
         self.dcTree.propagateChanges()
         self.frameParent.receiveChanges(minSetSize, minGiniRed, self.varNB.get())
